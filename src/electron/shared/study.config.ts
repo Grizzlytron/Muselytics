@@ -2,14 +2,15 @@ import { StudyConfiguration } from './StudyConfiguration';
 import { DataExportFormat } from './DataExportFormat.enum';
 
 const studyConfig: StudyConfiguration = {
-  name: 'PersonalAnalytics Study',
+  name: 'GrizzlyAnalytics',
   shortDescription:
-    'PersonalAnalytics is a self-monitoring software developed by the Human Aspects of Software Engineering Lab of the University of Zurich to non-intrusively collect computer interaction data and store it locally on your computer. Every now and then, a self-reflection question asks you about time well spent and perceived productivity. In the future, it will add a retrospection that will visualize and correlate the automatically collected and manually reported data to help you learn more about how you spend your time and your productivity. This software is open source, can be adapted and re-used for your own scientific studies.',
+    'GrizzlyAnalytics is Lucas  is a self-monitoring software developed by the Human Aspects of Software Engineering Lab of the University of Zurich to non-intrusively collect computer interaction data and store it locally on your computer. Every now and then, a self-reflection question asks you about time well spent and perceived productivity. In the future, it will add a retrospection that will visualize and correlate the automatically collected and manually reported data to help you learn more about how you spend your time and your productivity. This software is open source, can be adapted and re-used for your own scientific studies.',
   infoUrl: 'https://github.com/HASEL-UZH/PersonalAnalytics',
-  privacyPolicyUrl: 'https://github.com/HASEL-UZH/PersonalAnalytics/blob/dev/documentation/PRIVACY.md',
+  privacyPolicyUrl:
+    'https://github.com/HASEL-UZH/PersonalAnalytics/blob/dev/documentation/PRIVACY.md',
   uploadUrl: 'https://hasel.dev/upload',
-  contactName: 'Dr. André Meyer',
-  contactEmail: 'study@hasel.dev',
+  contactName: 'Lucas Baer',
+  contactEmail: 'lucastimothyleo.baer@uzh.ch',
   subjectIdLength: 6,
   dataExportEnabled: true,
   dataExportFormat: DataExportFormat.ExportToDDL, // default should be ExportAsZippedSqlite,
