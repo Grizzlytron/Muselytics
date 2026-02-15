@@ -10,6 +10,7 @@ import { DataExportType } from '../../shared/DataExportType.enum';
 import WindowActivityDto from '../../shared/dto/WindowActivityDto';
 import UserInputDto from '../../shared/dto/UserInputDto';
 import DataExportExperienceSamplingTracker from '../components/DataExportExperienceSamplingTracker.vue';
+import DataExportMuseTracker from '../components/DataExportMuseTracker.vue';
 import ExperienceSamplingDto from '../../shared/dto/ExperienceSamplingDto';
 import getRendererLogger from '../utils/Logger';
 
@@ -31,6 +32,8 @@ const obfuscateWindowActivities = ref(false);
 const exportExperienceSamplesSelectedOption = ref<DataExportType>(DataExportType.None);
 const exportWindowActivitySelectedOption = ref<DataExportType>(DataExportType.None);
 const exportUserInputSelectedOption = ref<DataExportType>(DataExportType.None);
+
+  const exportMuseSelectedOption = ref<boolean>(false);
 
 const obfuscationTermsInput = ref<string[]>();
 
@@ -71,6 +74,9 @@ onMounted(async () => {
   if (studyConfig.trackers.userInputTracker.enabled) {
     exportUserInputSelectedOption.value = DataExportType.All;
     mostRecentUserInputs.value = await typedIpcRenderer.invoke('getMostRecentUserInputDtos', 20);
+  }
+  if (studyConfig.trackers.museTracker.enabled) {
+    exportMuseSelectedOption.value = true;
   }
   isLoading.value = false;
 });
@@ -376,6 +382,10 @@ function revealItemInFolder(event: Event) {
               :data="mostRecentExperienceSamples"
               :default-value="exportExperienceSamplesSelectedOption"
               @change="handleExperienceSamplingConfigChanged"
+            />
+            <DataExportMuseTracker
+              v-if="studyConfig.trackers.museTracker.enabled"
+              v-model:should-share="exportMuseSelectedOption"
             />
           </div>
         </transition-group>

@@ -314,8 +314,8 @@ export class DataExportService {
         encryptData
       );
   
-      const projectId = process.env.DDL_PROJECT_ID || 'add for debugging'; // set in Github Secrets
-      const projectToken = process.env.DDL_PROJECT_TOKEN || 'add for debugging'; // set in Github Secrets (expires after maximum of 90d)
+      const projectId = process.env.DDL_PROJECT_ID || 'cM1K4c89'; // TODO: set in Github Secrets
+      const projectToken = process.env.DDL_PROJECT_TOKEN || '768f1882b580f787e3efe79e64c25b3b57c0a8f3'; // set in Github Secrets (expires after maximum of 90d)
       const url = `https://datadonation.uzh.ch/api/zip/${projectId}`;
   
       const form = new FormData();

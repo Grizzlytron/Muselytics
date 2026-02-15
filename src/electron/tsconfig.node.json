@@ -1,6 +1,7 @@
 {
   "compilerOptions": {
     "composite": true,
+    "declaration": false,
     "module": "ESNext",
     "moduleResolution": "Node",
     "resolveJsonModule": true,
