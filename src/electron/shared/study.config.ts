@@ -14,7 +14,6 @@ const studyConfig: StudyConfiguration = {
   subjectIdLength: 6,
   dataExportEnabled: true,
   dataExportFormat: DataExportFormat.ExportAsZippedSqlite, // default should be ExportAsZippedSqlite,
-  dataExportFormat: DataExportFormat.ExportToDDL, // default should be ExportAsZippedSqlite,
   dataExportDDLProjectName: "PA_Test3", 
   dataExportEncrypted: false,
   displayDaysParticipated: true,
