@@ -297,9 +297,9 @@ export class IpcHandler {
         };
       }
       
-      // Calculate average signal quality
+      // Calculate average signal quality — only meaningful when a device is connected
       let avgQuality = 0;
-      if (latestData.length > 0) {
+      if (connectedDevice && latestData.length > 0) {
         const qualitySum = latestData.reduce((sum, d) => sum + (d.signalQuality || 0), 0);
         avgQuality = Math.round(qualitySum / latestData.length);
       }
@@ -316,12 +316,6 @@ export class IpcHandler {
           channel2_AF7: d.channel2_AF7,
           channel3_AF8: d.channel3_AF8,
           channel4_TP10: d.channel4_TP10,
-          accelerometerX: d.accelerometerX,
-          accelerometerY: d.accelerometerY,
-          accelerometerZ: d.accelerometerZ,
-          gyroX: d.gyroX,
-          gyroY: d.gyroY,
-          gyroZ: d.gyroZ,
           ppg: d.ppg,
           batteryLevel: d.batteryLevel,
           signalQuality: d.signalQuality,
@@ -377,12 +371,6 @@ export class IpcHandler {
         channel2_AF7: d.channel2_AF7,
         channel3_AF8: d.channel3_AF8,
         channel4_TP10: d.channel4_TP10,
-        accelerometerX: d.accelerometerX,
-        accelerometerY: d.accelerometerY,
-        accelerometerZ: d.accelerometerZ,
-        gyroX: d.gyroX,
-        gyroY: d.gyroY,
-        gyroZ: d.gyroZ,
         ppg: d.ppg,
         batteryLevel: d.batteryLevel,
         signalQuality: d.signalQuality,

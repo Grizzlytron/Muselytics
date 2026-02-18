@@ -90,7 +90,7 @@
               </svg>
             </div>
             <div class="stat-title">Signal Quality</div>
-            <div class="stat-value text-lg">{{ averageSignalQuality }}/4</div>
+            <div class="stat-value text-lg" :class="connectedDevice ? signalQualityColor : ''">{{ connectedDevice ? signalQualityLabel : '--' }}</div>
           </div>
         </div>
 
@@ -163,12 +163,13 @@
                     <div>
                       <div class="flex justify-between text-sm mb-1">
                         <span>Signal Quality</span>
-                        <span>{{ connectedDevice.signalQuality || 0 }}/4</span>
+                        <span :class="signalQualityColor">{{ signalQualityLabel }}</span>
                       </div>
                       <progress 
-                        :value="connectedDevice.signalQuality || 0" 
+                        :value="connectedDevice.signalQuality === 1 ? 4 : connectedDevice.signalQuality === 2 ? 2 : 0" 
                         max="4" 
-                        class="progress progress-info w-full"
+                        class="progress w-full" 
+                        :class="signalQualityProgressClass"
                       ></progress>
                     </div>
                     <div>
@@ -240,44 +241,6 @@
                   </svg>
                   Refresh Data
                 </button>
-                <button
-                  @click="runDiagnostics"
-                  class="btn btn-warning btn-lg gap-2"
-                >
-                  <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                  </svg>
-                  Run Diagnostics
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <!-- Troubleshooting Card -->
-        <div v-if="!connectedDevice && isTrackerRunning" class="card bg-warning/20 border border-warning shadow-md">
-          <div class="card-body">
-            <h3 class="card-title text-warning text-sm">⚠️ Connection Troubleshooting</h3>
-            <div class="text-sm space-y-2">
-              <div class="flex gap-2">
-                <span>1.</span>
-                <span>Ensure your Muse device is in <strong>pairing mode</strong></span>
-              </div>
-              <div class="flex gap-2">
-                <span>2.</span>
-                <span>Keep the device <strong>close to your computer</strong> (within 10 meters)</span>
-              </div>
-              <div class="flex gap-2">
-                <span>3.</span>
-                <span>Click <strong>Start Tracking</strong> to begin scanning for devices</span>
-              </div>
-              <div class="flex gap-2">
-                <span>4.</span>
-                <span>Wait 5-10 seconds for devices to appear in the list</span>
-              </div>
-              <div class="flex gap-2">
-                <span>5.</span>
-                <span>If still not found, <strong>restart your Muse device</strong> and try again</span>
               </div>
             </div>
           </div>
@@ -339,10 +302,10 @@
                     <td>{{ formatNumber(data.channel4_TP10) }}</td>
                     <td>
                       <span class="badge badge-xs" :class="{
-                        'badge-success': (data.signalQuality ?? 0) >= 3,
+                        'badge-success': data.signalQuality === 1,
                         'badge-warning': data.signalQuality === 2,
-                        'badge-error': (data.signalQuality ?? 0) < 2
-                      }">{{ data.signalQuality ?? 'N/A' }}</span>
+                        'badge-error': !data.signalQuality || data.signalQuality >= 4
+                      }">{{ data.signalQuality === 1 ? 'Good' : data.signalQuality === 2 ? 'Med' : data.signalQuality ? 'Poor' : 'N/A' }}</span>
                     </td>
                   </tr>
                 </tbody>
@@ -382,7 +345,7 @@
         <div class="card bg-base-200 shadow-xl">
           <div class="card-body flex flex-col">
             <div class="flex justify-between items-center">
-              <h3 class="card-title">📈 Heart Rate Over Time</h3>
+              <h3 class="card-title">📈 Heart Rate</h3>
               <div class="flex items-center gap-3">
                 <span v-if="heartRateHistory.length > 0" class="badge badge-ghost text-xs">
                   {{ heartRateHistory.length }} readings
@@ -415,7 +378,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted, computed, defineAsyncComponent, shallowRef } from 'vue';
+import { ref, onMounted, onUnmounted, computed } from 'vue';
 import typedIpcRenderer from '../utils/typedIpcRenderer';
 import {
   Chart as ChartJS,
@@ -430,17 +393,7 @@ import {
 } from 'chart.js';
 import { Line } from 'vue-chartjs';
 
-// Register Chart.js components
-ChartJS.register(
-  CategoryScale,
-  LinearScale,
-  PointElement,
-  LineElement,
-  Title,
-  Tooltip,
-  Legend,
-  Filler
-);
+ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Title, Tooltip, Legend, Filler);
 
 interface MuseData {
   id: string;
@@ -451,12 +404,6 @@ interface MuseData {
   channel2_AF7?: number;
   channel3_AF8?: number;
   channel4_TP10?: number;
-  accelerometerX?: number;
-  accelerometerY?: number;
-  accelerometerZ?: number;
-  gyroX?: number;
-  gyroY?: number;
-  gyroZ?: number;
   ppg?: number;
   batteryLevel?: number;
   signalQuality?: number;
@@ -474,13 +421,13 @@ const isTrackerRunning = ref(false);
 const connectedDevice = ref<ConnectedDevice | null>(null);
 const latestData = ref<MuseData[]>([]);
 const totalDataPoints = ref(0);
-const averageSignalQuality = ref(0);
 const activeTab = ref<'connection' | 'eeg' | 'ppg'>('connection');
 const isLoading = ref(true);
 const discoveredDevices = ref<Array<{ name: string; macAddress: string; rssi: number }>>([]);
 const selectedDeviceMac = ref<string>('');
 const isConnecting = ref(false);
 let refreshInterval: ReturnType<typeof setInterval> | null = null;
+let lastDataHash = '';  // track whether EEG data actually changed
 
 // Heart rate history for graph (rolling window of last 120 readings = ~4 min at 2s refresh)
 const MAX_HR_POINTS = 120;
@@ -492,8 +439,29 @@ const availableDevices = computed(() => {
   if (!connectedDevice.value) {
     return discoveredDevices.value;
   }
-  // Filter out the connected device by name
   return discoveredDevices.value.filter(d => d.name !== connectedDevice.value?.name);
+});
+
+// Signal quality descriptive labels (HSI: 1=good, 2=mediocre, 4=poor)
+const signalQualityLabel = computed(() => {
+  const q = connectedDevice.value?.signalQuality ?? 4;
+  if (q <= 1) return 'Good';
+  if (q <= 2) return 'Mediocre';
+  return 'Poor';
+});
+
+const signalQualityColor = computed(() => {
+  const q = connectedDevice.value?.signalQuality ?? 4;
+  if (q <= 1) return 'text-success';
+  if (q <= 2) return 'text-warning';
+  return 'text-error';
+});
+
+const signalQualityProgressClass = computed(() => {
+  const q = connectedDevice.value?.signalQuality ?? 4;
+  if (q <= 1) return 'progress-success';
+  if (q <= 2) return 'progress-warning';
+  return 'progress-error';
 });
 
 // Chart data for EEG
@@ -544,10 +512,10 @@ const eegChartData = computed(() => {
   };
 });
 
-const eegChartOptions = {
+const eegChartOptions = computed(() => ({
   responsive: true,
   maintainAspectRatio: false,
-  animation: { duration: 0 },
+  animation: connectedDevice.value ? { duration: 0 } : false as const,
   scales: {
     x: {
       display: true,
@@ -565,7 +533,7 @@ const eegChartOptions = {
     legend: { display: true, position: 'top' as const },
     tooltip: { enabled: true }
   }
-};
+}));
 
 // Heart rate chart data
 const hrChartData = computed(() => {
@@ -593,7 +561,7 @@ const hrChartData = computed(() => {
 const hrChartOptions = {
   responsive: true,
   maintainAspectRatio: false,
-  animation: { duration: 300 },
+  animation: false as const,
   scales: {
     x: {
       display: true,
@@ -637,12 +605,21 @@ async function loadData() {
     if (data) {
       isTrackerRunning.value = data.isRunning;
       connectedDevice.value = data.connectedDevice || null;
-      latestData.value = (data.latestData || []).map((d: any) => ({
-        ...d,
-        timestamp: new Date(d.timestamp)
-      }));
       totalDataPoints.value = data.totalDataPoints || 0;
-      averageSignalQuality.value = data.averageSignalQuality || 0;
+
+      // Only update latestData when the data actually changed to avoid
+      // unnecessary Chart.js re-renders that cause freezes
+      const incoming = data.latestData || [];
+      const newHash = incoming.length > 0
+        ? `${incoming.length}-${incoming[0]?.id}-${incoming[incoming.length - 1]?.id}`
+        : '0';
+      if (newHash !== lastDataHash) {
+        lastDataHash = newHash;
+        latestData.value = incoming.map((d: any) => ({
+          ...d,
+          timestamp: new Date(d.timestamp)
+        }));
+      }
 
       // Record heart rate into rolling history for graph
       const hr = data.connectedDevice?.heartRate;
@@ -693,16 +670,6 @@ async function stopTracking() {
 
 async function refreshData() {
   await loadData();
-}
-
-async function runDiagnostics() {
-  try {
-    console.log('Running Muse diagnostics...');
-    await typedIpcRenderer.invoke('muse:run-diagnostics');
-    console.log('Diagnostics completed. Check main process logs for details.');
-  } catch (error) {
-    console.error('Error running diagnostics:', error);
-  }
 }
 
 function selectDevice(device: any) {

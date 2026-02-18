@@ -80,10 +80,12 @@ export class MuseTracker implements Tracker {
   // Data aggregation buffers
   private eegBuffer: DataPacket[] = [];
   private ppgBuffer: DataPacket[] = [];
-  private accelerometerBuffer: DataPacket[] = [];
-  private gyroBuffer: DataPacket[] = [];
   private batteryBuffer: DataPacket[] = [];
   private lastBatteryLevel: number = 0;
+
+  // HSI_PRECISION-based signal quality (1=good, 2=mediocre, 4=poor per channel)
+  // We store the latest per-channel values and derive a 1-4 UI score
+  private lastHsiValues: number[] = [4, 4, 4, 4]; // Default: poor fit (no head)
 
   // Heart rate calculation from raw Optics/PPG stream
   private ppgRawSamples: number[] = [];           // Ring buffer of raw optics values at ~64 Hz
@@ -99,18 +101,22 @@ export class MuseTracker implements Tracker {
   constructor(collectingInterval: number = 5000) {
     this.collectingInterval = collectingInterval;
     this.trackerService = new MuseTrackerService();
-    
+    LOG.info(`${this.name} created, native module will be loaded on start()`);
+  }
+
+  /** Load native module lazily — only when actually starting the tracker */
+  private ensureNativeLoaded(): boolean {
+    if (this.nativeAvailable) return true;
     try {
       this.museCore = getMuseTrackerCore();
       this.setupEventHandlers();
       this.nativeAvailable = true;
-      LOG.info(`${this.name} initialized with native module, ${collectingInterval}ms collection interval`);
-      LOG.info(`Native module test - attempting to get devices...`);
-      const testDevices = this.museCore.getDiscoveredDevices();
-      LOG.info(`Test device discovery returned: ${testDevices.length} devices`);
+      LOG.info(`${this.name} native module loaded successfully`);
+      return true;
     } catch (error) {
-      LOG.warn(`${this.name} initialized without native module (will run in stub mode)`, error);
+      LOG.warn(`${this.name} native module not available (stub mode)`, error);
       this.nativeAvailable = false;
+      return false;
     }
   }
 
@@ -186,16 +192,6 @@ export class MuseTracker implements Tracker {
       }
     });
 
-    // Accelerometer data
-    this.museCore.on('accelerometerData', (packet: DataPacket) => {
-      this.accelerometerBuffer.push(packet);
-    });
-
-    // Gyro data
-    this.museCore.on('gyroData', (packet: DataPacket) => {
-      this.gyroBuffer.push(packet);
-    });
-
     // Battery data
     this.museCore.on('batteryData', (packet: DataPacket) => {
       const channels = packet.channels as any;
@@ -208,6 +204,22 @@ export class MuseTracker implements Tracker {
         LOG.info(`Battery level from values: ${this.lastBatteryLevel}%`);
       }
       this.batteryBuffer.push(packet);
+    });
+
+    // HSI_PRECISION data — headband fit quality per channel
+    // Values: 1 = good fit, 2 = mediocre fit, 4 = poor fit
+    this.museCore.on('hsiData', (packet: DataPacket) => {
+      if (packet.values && packet.values.length >= 4) {
+        this.lastHsiValues = packet.values.slice(0, 4);
+      } else if (packet.channels) {
+        const ch = packet.channels as any;
+        this.lastHsiValues = [
+          ch.ch0 ?? ch.eeg1 ?? 4,
+          ch.ch1 ?? ch.eeg2 ?? 4,
+          ch.ch2 ?? ch.eeg3 ?? 4,
+          ch.ch3 ?? ch.eeg4 ?? 4
+        ];
+      }
     });
 
     // Errors
@@ -237,6 +249,9 @@ export class MuseTracker implements Tracker {
     try {
       LOG.info(`Starting ${this.name}...`);
       
+      // Load native module on first start (deferred from constructor)
+      this.ensureNativeLoaded();
+
       if (this.nativeAvailable && this.museCore) {
         // Start device discovery
         LOG.info('Starting Bluetooth device discovery...');
@@ -553,43 +568,10 @@ export class MuseTracker implements Tracker {
         avgPPG /= this.ppgBuffer.length;
       }
 
-      // Calculate average accelerometer
-      let avgAccelX = 0, avgAccelY = 0, avgAccelZ = 0;
-      if (this.accelerometerBuffer.length > 0) {
-        for (const packet of this.accelerometerBuffer) {
-          if (packet.channels && 'x' in packet.channels) {
-            const channels = packet.channels as any;
-            avgAccelX += channels.x || 0;
-            avgAccelY += channels.y || 0;
-            avgAccelZ += channels.z || 0;
-          }
-        }
-        const count = this.accelerometerBuffer.length;
-        avgAccelX /= count;
-        avgAccelY /= count;
-        avgAccelZ /= count;
-      }
-
-      // Calculate average gyro
-      let avgGyroX = 0, avgGyroY = 0, avgGyroZ = 0;
-      if (this.gyroBuffer.length > 0) {
-        for (const packet of this.gyroBuffer) {
-          if (packet.channels && 'x' in packet.channels) {
-            const channels = packet.channels as any;
-            avgGyroX += channels.x || 0;
-            avgGyroY += channels.y || 0;
-            avgGyroZ += channels.z || 0;
-          }
-        }
-        const count = this.gyroBuffer.length;
-        avgGyroX /= count;
-        avgGyroY /= count;
-        avgGyroZ /= count;
-      }
-
-      // Calculate signal quality (based on number of samples received)
-      const expectedSamples = this.collectingInterval / 4; // EEG at ~256 Hz
-      const signalQuality = Math.min(4, Math.floor((this.eegBuffer.length / expectedSamples) * 4));
+      // Signal quality from HSI_PRECISION (SDK: 1=good, 2=mediocre, 4=poor)
+      // Pass the raw averaged HSI value — lower is better
+      const hsiAvg = this.lastHsiValues.reduce((a, b) => a + b, 0) / this.lastHsiValues.length;
+      const signalQuality = Math.round(hsiAvg); // 1, 2, or 4
 
       // Create data object
       const museData: MuseData = {
@@ -600,21 +582,13 @@ export class MuseTracker implements Tracker {
         channel2_AF7: avgAF7,
         channel3_AF8: avgAF8,
         channel4_TP10: avgTP10,
-        accelerometerX: avgAccelX,
-        accelerometerY: avgAccelY,
-        accelerometerZ: avgAccelZ,
-        gyroX: avgGyroX,
-        gyroY: avgGyroY,
-        gyroZ: avgGyroZ,
         ppg: avgPPG,
         batteryLevel: this.lastBatteryLevel,
         signalQuality: signalQuality,
         connectionState: 'connected',
         additionalData: JSON.stringify({
           eegSamples: this.eegBuffer.length,
-          ppgSamples: this.ppgBuffer.length,
-          accelSamples: this.accelerometerBuffer.length,
-          gyroSamples: this.gyroBuffer.length
+          ppgSamples: this.ppgBuffer.length
         })
       };
 
@@ -626,8 +600,6 @@ export class MuseTracker implements Tracker {
       // Clear buffers
       this.eegBuffer = [];
       this.ppgBuffer = [];
-      this.accelerometerBuffer = [];
-      this.gyroBuffer = [];
       this.batteryBuffer = [];
       
     } catch (error) {

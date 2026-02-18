@@ -112,12 +112,6 @@ interface MuseData {
   channel2_AF7?: number;
   channel3_AF8?: number;
   channel4_TP10?: number;
-  accelerometerX?: number;
-  accelerometerY?: number;
-  accelerometerZ?: number;
-  gyroX?: number;
-  gyroY?: number;
-  gyroZ?: number;
   ppg?: number;
   batteryLevel?: number;
   signalQuality?: number;

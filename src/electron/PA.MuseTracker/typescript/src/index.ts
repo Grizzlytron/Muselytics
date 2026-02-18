@@ -106,6 +106,7 @@ interface MuseTrackerEvents {
     'accelerometerData': (packet: DataPacket) => void;
     'gyroData': (packet: DataPacket) => void;
     'batteryData': (packet: DataPacket) => void;
+    'hsiData': (packet: DataPacket) => void;
     'data': (packet: DataPacket) => void;
     'error': (error: Error) => void;
 }
@@ -133,6 +134,7 @@ export class MuseTrackerCore extends EventEmitter implements IMuseTracker {
         accelerometer: DataPacket[];
         gyro: DataPacket[];
         battery: DataPacket[];
+        hsi: DataPacket[];
     };
     private bufferSize: number;
     private lastBatteryLevel: number = 0;
@@ -166,7 +168,8 @@ export class MuseTrackerCore extends EventEmitter implements IMuseTracker {
             optics: [],
             accelerometer: [],
             gyro: [],
-            battery: []
+            battery: [],
+            hsi: []
         };
 
         try {
@@ -430,6 +433,9 @@ export class MuseTrackerCore extends EventEmitter implements IMuseTracker {
                 case DataPacketType.OPTICS:
                     this.emit('opticsData', packet);
                     break;
+                case DataPacketType.HSI_PRECISION:
+                    this.emit('hsiData', packet);
+                    break;
             }
         };
 
@@ -457,6 +463,9 @@ export class MuseTrackerCore extends EventEmitter implements IMuseTracker {
                 break;
             case DataPacketType.OPTICS:
                 buffer = this.dataBuffers.optics;
+                break;
+            case DataPacketType.HSI_PRECISION:
+                buffer = this.dataBuffers.hsi;
                 break;
             default:
                 return;
@@ -504,6 +513,8 @@ export class MuseTrackerCore extends EventEmitter implements IMuseTracker {
             this.log('OPTICS listener registered (for heart rate)');
             this.registerDataListener(DataPacketType.BATTERY);
             this.log('Battery listener registered');
+            this.registerDataListener(DataPacketType.HSI_PRECISION);
+            this.log('HSI_PRECISION listener registered (signal quality)');
             
             this.log('Calling enableDataTransmission(true)...');
             this.connectedMuse.enableDataTransmission(true);
@@ -555,6 +566,7 @@ export class MuseTrackerCore extends EventEmitter implements IMuseTracker {
         this.dataBuffers.accelerometer = [];
         this.dataBuffers.gyro = [];
         this.dataBuffers.battery = [];
+        this.dataBuffers.hsi = [];
     }
 
     /**

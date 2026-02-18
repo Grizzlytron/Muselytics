@@ -28,25 +28,6 @@ export class MuseEntity extends BaseTrackedEntity {
   @Column('float', { nullable: true })
   channel4_TP10: number;  // Right ear (TP10)
 
-  // Sensor data (accelerometer and gyroscope)
-  @Column('float', { nullable: true })
-  accelerometerX: number;
-
-  @Column('float', { nullable: true })
-  accelerometerY: number;
-
-  @Column('float', { nullable: true })
-  accelerometerZ: number;
-
-  @Column('float', { nullable: true })
-  gyroX: number;
-
-  @Column('float', { nullable: true })
-  gyroY: number;
-
-  @Column('float', { nullable: true })
-  gyroZ: number;
-
   // PPG (Photoplethysmography - heart rate data)
   @Column('float', { nullable: true })
   ppg: number;
