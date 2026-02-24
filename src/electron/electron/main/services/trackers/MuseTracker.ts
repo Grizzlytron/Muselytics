@@ -77,10 +77,41 @@ export class MuseTracker implements Tracker {
   private isConnected: boolean = false;
   private nativeAvailable: boolean = false;
 
-  // Data aggregation buffers
+  // Data aggregation buffers - Raw sensors
   private eegBuffer: DataPacket[] = [];
   private ppgBuffer: DataPacket[] = [];
   private batteryBuffer: DataPacket[] = [];
+  private accelerometerBuffer: DataPacket[] = [];
+  private gyroBuffer: DataPacket[] = [];
+  private drlRefBuffer: DataPacket[] = [];
+  
+  // Band power buffers - Relative
+  private alphaRelativeBuffer: DataPacket[] = [];
+  private betaRelativeBuffer: DataPacket[] = [];
+  private deltaRelativeBuffer: DataPacket[] = [];
+  private thetaRelativeBuffer: DataPacket[] = [];
+  private gammaRelativeBuffer: DataPacket[] = [];
+  
+  // Band power buffers - Absolute
+  private alphaAbsoluteBuffer: DataPacket[] = [];
+  private betaAbsoluteBuffer: DataPacket[] = [];
+  private deltaAbsoluteBuffer: DataPacket[] = [];
+  private thetaAbsoluteBuffer: DataPacket[] = [];
+  private gammaAbsoluteBuffer: DataPacket[] = [];
+  
+  // Band power buffers - Scores
+  private alphaScoreBuffer: DataPacket[] = [];
+  private betaScoreBuffer: DataPacket[] = [];
+  private deltaScoreBuffer: DataPacket[] = [];
+  private thetaScoreBuffer: DataPacket[] = [];
+  private gammaScoreBuffer: DataPacket[] = [];
+  
+  // Quality indicator buffers
+  private isGoodBuffer: DataPacket[] = [];
+  
+  // Derived EEG buffers
+  private varianceEegBuffer: DataPacket[] = [];
+  
   private lastBatteryLevel: number = 0;
 
   // HSI_PRECISION-based signal quality (1=good, 2=mediocre, 4=poor per channel)
@@ -96,7 +127,8 @@ export class MuseTracker implements Tracker {
 
   // PRESET_1035: 4CH EEG 14bit@256Hz + 4CH Optics@64Hz low-power + accel/gyro@52Hz + battery@1Hz
   // This is the optimal battery-saving preset that includes optics for heart rate
-  private readonly MUSE_2025_PRESET = 34; // SDK enum index for PRESET_1035
+  private readonly MUSE_2025_PRESET = 35; // SDK enum index for PRESET_1035
+  private presetConfigured: boolean = false; // Track if we've set the preset (to handle disconnect/reconnect)
 
   constructor(collectingInterval: number = 5000) {
     this.collectingInterval = collectingInterval;
@@ -141,25 +173,30 @@ export class MuseTracker implements Tracker {
         this.currentDeviceName = packet.museName;
         LOG.info(`Successfully connected to ${packet.museName}`);
 
-        // Set battery-optimized preset (PRESET_1035: EEG + low-power Optics)
-        try {
-          this.museCore.setPreset(this.MUSE_2025_PRESET);
-          LOG.info('Set PRESET_1035 (EEG + low-power Optics) for battery optimization');
-        } catch (err) {
-          LOG.warn('Failed to set preset (device may reconnect with default)', err);
-        }
-
-        // Start streaming data (only EEG, Optics, Battery — no accel/gyro)
-        try {
-          this.museCore.startStreaming();
-          LOG.info('Started streaming data (battery-optimized: EEG + Optics + Battery only)');
-        } catch (err) {
-          LOG.error('Failed to start streaming', err);
+        // Check if we need to configure the preset
+        if (!this.presetConfigured) {
+          // First connection - set the preset (this will cause disconnect/reconnect)
+          LOG.info('First connection - setting PRESET_1035 to enable all sensors...');
+          try {
+            this.museCore.setPreset(this.MUSE_2025_PRESET);
+            this.presetConfigured = true;
+            LOG.info('Preset set - device will disconnect and reconnect with PRESET_1035');
+          } catch (err) {
+            LOG.error('Failed to set preset', err);
+            // If preset fails, enable streaming anyway with default preset
+            this.presetConfigured = true;
+            this.enableStreaming();
+          }
+        } else {
+          // Second connection (after preset applied) - now enable data transmission
+          LOG.info('Reconnected with PRESET_1035 - all data listeners active');
+          this.enableStreaming();
         }
       } else if (packet.currentState === ConnectionState.DISCONNECTED) {
         this.isConnected = false;
         this.currentDeviceId = null;
         this.currentDeviceName = null;
+        this.presetConfigured = false; // Reset flag on disconnect
         LOG.info(`Disconnected from ${packet.museName}`);
       } else if (packet.currentState === ConnectionState.CONNECTING) {
         LOG.info(`Connecting to ${packet.museName}...`);
@@ -224,6 +261,92 @@ export class MuseTracker implements Tracker {
       }
     });
 
+    // Movement sensors
+    this.museCore.on('accelerometerData', (packet: DataPacket) => {
+      this.accelerometerBuffer.push(packet);
+    });
+
+    this.museCore.on('gyroData', (packet: DataPacket) => {
+      this.gyroBuffer.push(packet);
+    });
+
+    this.museCore.on('drlRefData', (packet: DataPacket) => {
+      this.drlRefBuffer.push(packet);
+    });
+
+    // Band power data - Relative (best for ML)
+    this.museCore.on('alphaRelativeData', (packet: DataPacket) => {
+      this.alphaRelativeBuffer.push(packet);
+    });
+
+    this.museCore.on('betaRelativeData', (packet: DataPacket) => {
+      this.betaRelativeBuffer.push(packet);
+    });
+
+    this.museCore.on('deltaRelativeData', (packet: DataPacket) => {
+      this.deltaRelativeBuffer.push(packet);
+    });
+
+    this.museCore.on('thetaRelativeData', (packet: DataPacket) => {
+      this.thetaRelativeBuffer.push(packet);
+    });
+
+    this.museCore.on('gammaRelativeData', (packet: DataPacket) => {
+      this.gammaRelativeBuffer.push(packet);
+    });
+
+    // Band power data - Absolute
+    this.museCore.on('alphaAbsoluteData', (packet: DataPacket) => {
+      this.alphaAbsoluteBuffer.push(packet);
+    });
+
+    this.museCore.on('betaAbsoluteData', (packet: DataPacket) => {
+      this.betaAbsoluteBuffer.push(packet);
+    });
+
+    this.museCore.on('deltaAbsoluteData', (packet: DataPacket) => {
+      this.deltaAbsoluteBuffer.push(packet);
+    });
+
+    this.museCore.on('thetaAbsoluteData', (packet: DataPacket) => {
+      this.thetaAbsoluteBuffer.push(packet);
+    });
+
+    this.museCore.on('gammaAbsoluteData', (packet: DataPacket) => {
+      this.gammaAbsoluteBuffer.push(packet);
+    });
+
+    // Band power data - Scores
+    this.museCore.on('alphaScoreData', (packet: DataPacket) => {
+      this.alphaScoreBuffer.push(packet);
+    });
+
+    this.museCore.on('betaScoreData', (packet: DataPacket) => {
+      this.betaScoreBuffer.push(packet);
+    });
+
+    this.museCore.on('deltaScoreData', (packet: DataPacket) => {
+      this.deltaScoreBuffer.push(packet);
+    });
+
+    this.museCore.on('thetaScoreData', (packet: DataPacket) => {
+      this.thetaScoreBuffer.push(packet);
+    });
+
+    this.museCore.on('gammaScoreData', (packet: DataPacket) => {
+      this.gammaScoreBuffer.push(packet);
+    });
+
+    // Quality indicators
+    this.museCore.on('isGoodData', (packet: DataPacket) => {
+      this.isGoodBuffer.push(packet);
+    });
+
+    // Derived EEG values
+    this.museCore.on('varianceEegData', (packet: DataPacket) => {
+      this.varianceEegBuffer.push(packet);
+    });
+
     // Errors
     this.museCore.on('error', (error: Error) => {
       LOG.error('Muse device error', error);
@@ -246,6 +369,18 @@ export class MuseTracker implements Tracker {
         return 'NEEDS_LICENSE';
       default:
         return `UNKNOWN(${state})`;
+    }
+  }
+
+  /**
+   * Enable data streaming after connection and preset configuration
+   */
+  private enableStreaming(): void {
+    try {
+      this.museCore.startStreaming();
+      LOG.info('Data transmission enabled - all sensors active (EEG, PPG, accelerometer, gyro, battery, band powers)');
+    } catch (err) {
+      LOG.error('Failed to enable data transmission', err);
     }
   }
 
@@ -314,6 +449,9 @@ export class MuseTracker implements Tracker {
         this.museCore.stop();
       }
 
+      // Reset preset flag for next connection
+      this.presetConfigured = false;
+
       this.isRunning = false;
       LOG.info(`${this.name} stopped successfully`);
     } catch (error) {
@@ -363,6 +501,7 @@ export class MuseTracker implements Tracker {
       this.isConnected = false;
       this.currentDeviceId = null;
       this.currentDeviceName = null;
+      this.presetConfigured = false; // Reset for next connection
     } catch (error) {
       LOG.error('Failed to disconnect device', error);
     }
@@ -547,26 +686,73 @@ export class MuseTracker implements Tracker {
     try {
       const now = new Date();
 
+      const isFiniteNumber = (value: unknown): value is number =>
+        typeof value === 'number' && Number.isFinite(value);
+
+      // Helper function to average DataPacket values
+      const averagePackets = (buffer: DataPacket[]): number => {
+        if (buffer.length === 0) return 0;
+        let sum = 0;
+        let count = 0;
+        for (const packet of buffer) {
+          if (packet.values && packet.values.length > 0) {
+            const finiteValues = packet.values.filter((value) => isFiniteNumber(value));
+            if (finiteValues.length === 0) {
+              continue;
+            }
+            // Average all channels together
+            sum += finiteValues.reduce((a, b) => a + b, 0) / finiteValues.length;
+            count++;
+          }
+        }
+        return count > 0 ? sum / count : 0;
+      };
+
+      // Helper function to calculate magnitude from 3-axis data
+      const average3AxisMagnitude = (buffer: DataPacket[]): number => {
+        if (buffer.length === 0) return 0;
+        let sum = 0;
+        let count = 0;
+        for (const packet of buffer) {
+          if (packet.values && packet.values.length >= 3) {
+            const [x, y, z] = packet.values;
+            if (!isFiniteNumber(x) || !isFiniteNumber(y) || !isFiniteNumber(z)) {
+              continue;
+            }
+            sum += Math.sqrt(x * x + y * y + z * z);
+            count++;
+          }
+        }
+        return count > 0 ? sum / count : 0;
+      };
+
       // Calculate average EEG values
       let avgTP9 = 0,
         avgAF7 = 0,
         avgAF8 = 0,
         avgTP10 = 0;
       if (this.eegBuffer.length > 0) {
+        let eegCount = 0;
         for (const packet of this.eegBuffer) {
           if (packet.channels && 'tp9' in packet.channels) {
             const channels = packet.channels as any;
-            avgTP9 += channels.tp9 || 0;
-            avgAF7 += channels.af7 || 0;
-            avgAF8 += channels.af8 || 0;
-            avgTP10 += channels.tp10 || 0;
+            const tp9 = isFiniteNumber(channels.tp9) ? channels.tp9 : 0;
+            const af7 = isFiniteNumber(channels.af7) ? channels.af7 : 0;
+            const af8 = isFiniteNumber(channels.af8) ? channels.af8 : 0;
+            const tp10 = isFiniteNumber(channels.tp10) ? channels.tp10 : 0;
+            avgTP9 += tp9;
+            avgAF7 += af7;
+            avgAF8 += af8;
+            avgTP10 += tp10;
+            eegCount++;
           }
         }
-        const count = this.eegBuffer.length;
-        avgTP9 /= count;
-        avgAF7 /= count;
-        avgAF8 /= count;
-        avgTP10 /= count;
+        if (eegCount > 0) {
+          avgTP9 /= eegCount;
+          avgAF7 /= eegCount;
+          avgAF8 /= eegCount;
+          avgTP10 /= eegCount;
+        }
       }
 
       // Calculate PPG value from buffered optics/ppg packets
@@ -576,8 +762,11 @@ export class MuseTracker implements Tracker {
         let ppgCount = 0;
         for (const packet of this.ppgBuffer) {
           if (packet.values && packet.values.length > 0) {
-            ppgSum += packet.values[0];
-            ppgCount++;
+            const value = packet.values[0];
+            if (isFiniteNumber(value)) {
+              ppgSum += value;
+              ppgCount++;
+            }
           }
         }
         if (ppgCount > 0) {
@@ -585,41 +774,128 @@ export class MuseTracker implements Tracker {
         }
       }
 
-      // Signal quality from HSI_PRECISION (SDK: 1=good, 2=mediocre, 4=poor)
-      // Pass the raw averaged HSI value — lower is better
-      const hsiAvg = this.lastHsiValues.reduce((a, b) => a + b, 0) / this.lastHsiValues.length;
-      const signalQuality = Math.round(hsiAvg); // 1, 2, or 4
+      // Movement sensors - average magnitude
+      const accelerometerAvg = average3AxisMagnitude(this.accelerometerBuffer);
+      const gyroAvg = average3AxisMagnitude(this.gyroBuffer);
 
-      // Create data object
+      // Band powers - Relative (0-1, normalized)
+      const alphaRelative = averagePackets(this.alphaRelativeBuffer);
+      const betaRelative = averagePackets(this.betaRelativeBuffer);
+      const deltaRelative = averagePackets(this.deltaRelativeBuffer);
+      const thetaRelative = averagePackets(this.thetaRelativeBuffer);
+      const gammaRelative = averagePackets(this.gammaRelativeBuffer);
+
+      // Band powers - Absolute (in Bels)
+      const alphaAbsolute = averagePackets(this.alphaAbsoluteBuffer);
+      const betaAbsolute = averagePackets(this.betaAbsoluteBuffer);
+      const deltaAbsolute = averagePackets(this.deltaAbsoluteBuffer);
+      const thetaAbsolute = averagePackets(this.thetaAbsoluteBuffer);
+      const gammaAbsolute = averagePackets(this.gammaAbsoluteBuffer);
+
+      // Band powers - Scores (0-1, percentile-based)
+      const alphaScore = averagePackets(this.alphaScoreBuffer);
+      const betaScore = averagePackets(this.betaScoreBuffer);
+      const deltaScore = averagePackets(this.deltaScoreBuffer);
+      const thetaScore = averagePackets(this.thetaScoreBuffer);
+      const gammaScore = averagePackets(this.gammaScoreBuffer);
+
+      // Quality indicators
+      const isGood = averagePackets(this.isGoodBuffer);
+      const varianceEeg = averagePackets(this.varianceEegBuffer);
+
+      // Signal quality from HSI_PRECISION (SDK: 1=good, 2=mediocre, 4=poor)
+      // Store an instant value (latest sample), using worst channel as overall quality.
+      const hsiValues = this.lastHsiValues.filter((value) => isFiniteNumber(value));
+      const signalQuality = hsiValues.length > 0 ? Math.max(...hsiValues) : 4;
+
+      const finiteOrZero = (value: number): number => (isFiniteNumber(value) ? value : 0);
+
+      // Create comprehensive data object for ML
       const museData: MuseData = {
         deviceId: this.currentDeviceId,
         deviceName: this.currentDeviceName || 'Unknown',
         timestamp: now,
-        channel1_TP9: avgTP9,
-        channel2_AF7: avgAF7,
-        channel3_AF8: avgAF8,
-        channel4_TP10: avgTP10,
-        ppg: ppgValue,
-        batteryLevel: this.lastBatteryLevel,
-        signalQuality: signalQuality,
+        // EEG channels
+        channel1_TP9: finiteOrZero(avgTP9),
+        channel2_AF7: finiteOrZero(avgAF7),
+        channel3_AF8: finiteOrZero(avgAF8),
+        channel4_TP10: finiteOrZero(avgTP10),
+        // Heart rate
+        ppg: finiteOrZero(ppgValue),
+        heartRate: finiteOrZero(this.currentHeartRate),
+        // Device status
+        batteryLevel: finiteOrZero(this.lastBatteryLevel),
+        signalQuality: finiteOrZero(signalQuality),
         connectionState: 'connected',
+        // Band powers - Relative
+        alphaRelative: finiteOrZero(alphaRelative),
+        betaRelative: finiteOrZero(betaRelative),
+        deltaRelative: finiteOrZero(deltaRelative),
+        thetaRelative: finiteOrZero(thetaRelative),
+        gammaRelative: finiteOrZero(gammaRelative),
+        // Band powers - Absolute
+        alphaAbsolute: finiteOrZero(alphaAbsolute),
+        betaAbsolute: finiteOrZero(betaAbsolute),
+        deltaAbsolute: finiteOrZero(deltaAbsolute),
+        thetaAbsolute: finiteOrZero(thetaAbsolute),
+        gammaAbsolute: finiteOrZero(gammaAbsolute),
+        // Band powers - Scores
+        alphaScore: finiteOrZero(alphaScore),
+        betaScore: finiteOrZero(betaScore),
+        deltaScore: finiteOrZero(deltaScore),
+        thetaScore: finiteOrZero(thetaScore),
+        gammaScore: finiteOrZero(gammaScore),
+        // Quality indicators
+        isGood: finiteOrZero(isGood),
+        varianceEeg: finiteOrZero(varianceEeg),
+        // Movement
+        accelerometerAvg: finiteOrZero(accelerometerAvg),
+        gyroAvg: finiteOrZero(gyroAvg),
+        // Metadata
         additionalData: JSON.stringify({
           eegSamples: this.eegBuffer.length,
-          ppgSamples: this.ppgBuffer.length
+          ppgSamples: this.ppgBuffer.length,
+          bandPowerSamples: this.betaRelativeBuffer.length,
+          accelerometerSamples: this.accelerometerBuffer.length,
+          gyroSamples: this.gyroBuffer.length
         })
       };
 
       // Save to database
       await this.trackerService.saveMuseData(museData);
 
-      LOG.debug(
-        `Saved aggregated Muse data: ${this.eegBuffer.length} EEG, ${this.ppgBuffer.length} PPG samples`
+      LOG.info(
+        `Saved aggregated Muse data: ` +
+        `EEG=${this.eegBuffer.length}, PPG=${this.ppgBuffer.length}, ` +
+        `BandPowers=${this.betaRelativeBuffer.length}, ` +
+        `Accel=${this.accelerometerBuffer.length}, Gyro=${this.gyroBuffer.length}, ` +
+        `IsGood=${this.isGoodBuffer.length}`
       );
 
-      // Clear buffers
+      // Clear all buffers
       this.eegBuffer = [];
       this.ppgBuffer = [];
       this.batteryBuffer = [];
+      this.accelerometerBuffer = [];
+      this.gyroBuffer = [];
+      this.drlRefBuffer = [];
+      this.alphaRelativeBuffer = [];
+      this.betaRelativeBuffer = [];
+      this.deltaRelativeBuffer = [];
+      this.thetaRelativeBuffer = [];
+      this.gammaRelativeBuffer = [];
+      this.alphaAbsoluteBuffer = [];
+      this.betaAbsoluteBuffer = [];
+      this.deltaAbsoluteBuffer = [];
+      this.thetaAbsoluteBuffer = [];
+      this.gammaAbsoluteBuffer = [];
+      this.alphaScoreBuffer = [];
+      this.betaScoreBuffer = [];
+      this.deltaScoreBuffer = [];
+      this.thetaScoreBuffer = [];
+      this.gammaScoreBuffer = [];
+      this.isGoodBuffer = [];
+      this.varianceEegBuffer = [];
     } catch (error) {
       LOG.error('Error aggregating and saving Muse data', error);
     }

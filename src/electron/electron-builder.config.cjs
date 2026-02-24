@@ -1,3 +1,5 @@
+const enableAzureSigning = process.env.ENABLE_AZURE_SIGNING === 'true';
+
 module.exports = {
   productName: 'PersonalAnalytics',
   appId: 'ch.ifi.hasel.personal-analytics',
@@ -42,12 +44,16 @@ module.exports = {
   win: {
     target: ['nsis'],
     verifyUpdateCodeSignature: false,
-    azureSignOptions: {
-      publisherName: `${process.env.AZURE_PUBLISHER_NAME}`,
-      endpoint: `${process.env.AZURE_ENDPOINT}`,
-      codeSigningAccountName: `${process.env.AZURE_CODE_SIGNING_NAME}`,
-      certificateProfileName: `${process.env.AZURE_CERT_PROFILE_NAME}`
-    }
+    ...(enableAzureSigning
+      ? {
+          azureSignOptions: {
+            publisherName: `${process.env.AZURE_PUBLISHER_NAME}`,
+            endpoint: `${process.env.AZURE_ENDPOINT}`,
+            codeSigningAccountName: `${process.env.AZURE_CODE_SIGNING_NAME}`,
+            certificateProfileName: `${process.env.AZURE_CERT_PROFILE_NAME}`
+          }
+        }
+      : {})
   },
   nsis: {
     oneClick: true,

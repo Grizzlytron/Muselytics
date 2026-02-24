@@ -100,13 +100,41 @@ interface MuseTrackerEvents {
   deviceDiscovered: (device: MuseDevice) => void;
   deviceListUpdated: (devices: MuseDevice[]) => void;
   connectionStateChanged: (packet: ConnectionPacket) => void;
+  // Raw sensor data
   eegData: (packet: DataPacket) => void;
   ppgData: (packet: DataPacket) => void;
   opticsData: (packet: DataPacket) => void;
   accelerometerData: (packet: DataPacket) => void;
   gyroData: (packet: DataPacket) => void;
   batteryData: (packet: DataPacket) => void;
+  drlRefData: (packet: DataPacket) => void;
+  // Band power - Absolute
+  alphaAbsoluteData: (packet: DataPacket) => void;
+  betaAbsoluteData: (packet: DataPacket) => void;
+  deltaAbsoluteData: (packet: DataPacket) => void;
+  thetaAbsoluteData: (packet: DataPacket) => void;
+  gammaAbsoluteData: (packet: DataPacket) => void;
+  // Band power - Relative
+  alphaRelativeData: (packet: DataPacket) => void;
+  betaRelativeData: (packet: DataPacket) => void;
+  deltaRelativeData: (packet: DataPacket) => void;
+  thetaRelativeData: (packet: DataPacket) => void;
+  gammaRelativeData: (packet: DataPacket) => void;
+  // Band power - Scores
+  alphaScoreData: (packet: DataPacket) => void;
+  betaScoreData: (packet: DataPacket) => void;
+  deltaScoreData: (packet: DataPacket) => void;
+  thetaScoreData: (packet: DataPacket) => void;
+  gammaScoreData: (packet: DataPacket) => void;
+  // Quality indicators
   hsiData: (packet: DataPacket) => void;
+  isGoodData: (packet: DataPacket) => void;
+  artifactsData: (packet: DataPacket) => void;
+  // Derived EEG values
+  notchFilteredEegData: (packet: DataPacket) => void;
+  varianceEegData: (packet: DataPacket) => void;
+  varianceNotchFilteredEegData: (packet: DataPacket) => void;
+  // General events
   data: (packet: DataPacket) => void;
   error: (error: Error) => void;
 }
@@ -131,13 +159,40 @@ export class MuseTrackerCore extends EventEmitter implements IMuseTracker {
   private isScanning: boolean = false;
   private discoveredDevices: Map<string, MuseDevice> = new Map();
   private dataBuffers: {
+    // Raw sensor data
     eeg: DataPacket[];
     ppg: DataPacket[];
     optics: DataPacket[];
     accelerometer: DataPacket[];
     gyro: DataPacket[];
     battery: DataPacket[];
+    drlRef: DataPacket[];
+    // Band power - Absolute
+    alphaAbsolute: DataPacket[];
+    betaAbsolute: DataPacket[];
+    deltaAbsolute: DataPacket[];
+    thetaAbsolute: DataPacket[];
+    gammaAbsolute: DataPacket[];
+    // Band power - Relative
+    alphaRelative: DataPacket[];
+    betaRelative: DataPacket[];
+    deltaRelative: DataPacket[];
+    thetaRelative: DataPacket[];
+    gammaRelative: DataPacket[];
+    // Band power - Scores
+    alphaScore: DataPacket[];
+    betaScore: DataPacket[];
+    deltaScore: DataPacket[];
+    thetaScore: DataPacket[];
+    gammaScore: DataPacket[];
+    // Quality indicators
     hsi: DataPacket[];
+    isGood: DataPacket[];
+    artifacts: DataPacket[];
+    // Derived EEG values
+    notchFilteredEeg: DataPacket[];
+    varianceEeg: DataPacket[];
+    varianceNotchFilteredEeg: DataPacket[];
   };
   private bufferSize: number;
   private lastBatteryLevel: number = 0;
@@ -166,13 +221,40 @@ export class MuseTrackerCore extends EventEmitter implements IMuseTracker {
     super();
     this.bufferSize = bufferSize;
     this.dataBuffers = {
+      // Raw sensor data
       eeg: [],
       ppg: [],
       optics: [],
       accelerometer: [],
       gyro: [],
       battery: [],
-      hsi: []
+      drlRef: [],
+      // Band power - Absolute
+      alphaAbsolute: [],
+      betaAbsolute: [],
+      deltaAbsolute: [],
+      thetaAbsolute: [],
+      gammaAbsolute: [],
+      // Band power - Relative
+      alphaRelative: [],
+      betaRelative: [],
+      deltaRelative: [],
+      thetaRelative: [],
+      gammaRelative: [],
+      // Band power - Scores
+      alphaScore: [],
+      betaScore: [],
+      deltaScore: [],
+      thetaScore: [],
+      gammaScore: [],
+      // Quality indicators
+      hsi: [],
+      isGood: [],
+      artifacts: [],
+      // Derived EEG values
+      notchFilteredEeg: [],
+      varianceEeg: [],
+      varianceNotchFilteredEeg: []
     };
 
     try {
@@ -369,15 +451,17 @@ export class MuseTrackerCore extends EventEmitter implements IMuseTracker {
       throw new Error(`Muse device with MAC address ${macAddress} not found`);
     }
 
+    // Store the muse for data listener registration
+    this.connectedMuse = muse;
+
     // Set up connection listener
     muse.registerConnectionListener((packet: ConnectionPacket) => {
       this.emit('connectionStateChanged', packet);
 
       if (packet.currentState === ConnectionState.CONNECTED) {
-        this.connectedMuse = muse;
         // Stop scanning for devices when connected
         this.isScanning = false;
-        this.log('Device connected - stopped scanning for new devices');
+        this.log('Device connected successfully - scanning stopped');
       } else if (packet.currentState === ConnectionState.DISCONNECTED) {
         this.connectedMuse = null;
         // Resume scanning for devices when disconnected
@@ -389,7 +473,15 @@ export class MuseTrackerCore extends EventEmitter implements IMuseTracker {
       }
     });
 
-    // Connect using runAsynchronously
+    // CRITICAL: Register ALL data listeners BEFORE calling runAsynchronously()
+    // The SDK needs to know what data types to compute before starting the processing loop
+    this.log('Registering all data listeners BEFORE connection...');
+    this.registerAllDataListeners();
+    this.log('All data listeners registered successfully');
+
+    // Connect using runAsynchronously (starts processing with all listeners already registered)
+    // Preset and enableDataTransmission will be called AFTER connection
+    this.log('Calling runAsynchronously() to start connection...');
     muse.runAsynchronously();
   }
 
@@ -429,6 +521,7 @@ export class MuseTrackerCore extends EventEmitter implements IMuseTracker {
 
       // Emit to specific event based on type
       switch (packet.packetType) {
+        // Raw sensor data
         case DataPacketType.EEG:
           this.emit('eegData', packet);
           break;
@@ -448,8 +541,76 @@ export class MuseTrackerCore extends EventEmitter implements IMuseTracker {
         case DataPacketType.OPTICS:
           this.emit('opticsData', packet);
           break;
+        case DataPacketType.DRL_REF:
+          this.emit('drlRefData', packet);
+          break;
+        // Band power - Absolute
+        case DataPacketType.ALPHA_ABSOLUTE:
+          this.emit('alphaAbsoluteData', packet);
+          break;
+        case DataPacketType.BETA_ABSOLUTE:
+          this.emit('betaAbsoluteData', packet);
+          break;
+        case DataPacketType.DELTA_ABSOLUTE:
+          this.emit('deltaAbsoluteData', packet);
+          break;
+        case DataPacketType.THETA_ABSOLUTE:
+          this.emit('thetaAbsoluteData', packet);
+          break;
+        case DataPacketType.GAMMA_ABSOLUTE:
+          this.emit('gammaAbsoluteData', packet);
+          break;
+        // Band power - Relative
+        case DataPacketType.ALPHA_RELATIVE:
+          this.emit('alphaRelativeData', packet);
+          break;
+        case DataPacketType.BETA_RELATIVE:
+          this.emit('betaRelativeData', packet);
+          break;
+        case DataPacketType.DELTA_RELATIVE:
+          this.emit('deltaRelativeData', packet);
+          break;
+        case DataPacketType.THETA_RELATIVE:
+          this.emit('thetaRelativeData', packet);
+          break;
+        case DataPacketType.GAMMA_RELATIVE:
+          this.emit('gammaRelativeData', packet);
+          break;
+        // Band power - Scores
+        case DataPacketType.ALPHA_SCORE:
+          this.emit('alphaScoreData', packet);
+          break;
+        case DataPacketType.BETA_SCORE:
+          this.emit('betaScoreData', packet);
+          break;
+        case DataPacketType.DELTA_SCORE:
+          this.emit('deltaScoreData', packet);
+          break;
+        case DataPacketType.THETA_SCORE:
+          this.emit('thetaScoreData', packet);
+          break;
+        case DataPacketType.GAMMA_SCORE:
+          this.emit('gammaScoreData', packet);
+          break;
+        // Quality indicators
         case DataPacketType.HSI_PRECISION:
           this.emit('hsiData', packet);
+          break;
+        case DataPacketType.IS_GOOD:
+          this.emit('isGoodData', packet);
+          break;
+        case DataPacketType.ARTIFACTS:
+          this.emit('artifactsData', packet);
+          break;
+        // Derived EEG values
+        case DataPacketType.NOTCH_FILTERED_EEG:
+          this.emit('notchFilteredEegData', packet);
+          break;
+        case DataPacketType.VARIANCE_EEG:
+          this.emit('varianceEegData', packet);
+          break;
+        case DataPacketType.VARIANCE_NOTCH_FILTERED_EEG:
+          this.emit('varianceNotchFilteredEegData', packet);
           break;
       }
     };
@@ -461,6 +622,7 @@ export class MuseTrackerCore extends EventEmitter implements IMuseTracker {
     let buffer: DataPacket[];
 
     switch (packet.packetType) {
+      // Raw sensor data
       case DataPacketType.EEG:
         buffer = this.dataBuffers.eeg;
         break;
@@ -479,8 +641,76 @@ export class MuseTrackerCore extends EventEmitter implements IMuseTracker {
       case DataPacketType.OPTICS:
         buffer = this.dataBuffers.optics;
         break;
+      case DataPacketType.DRL_REF:
+        buffer = this.dataBuffers.drlRef;
+        break;
+      // Band power - Absolute
+      case DataPacketType.ALPHA_ABSOLUTE:
+        buffer = this.dataBuffers.alphaAbsolute;
+        break;
+      case DataPacketType.BETA_ABSOLUTE:
+        buffer = this.dataBuffers.betaAbsolute;
+        break;
+      case DataPacketType.DELTA_ABSOLUTE:
+        buffer = this.dataBuffers.deltaAbsolute;
+        break;
+      case DataPacketType.THETA_ABSOLUTE:
+        buffer = this.dataBuffers.thetaAbsolute;
+        break;
+      case DataPacketType.GAMMA_ABSOLUTE:
+        buffer = this.dataBuffers.gammaAbsolute;
+        break;
+      // Band power - Relative
+      case DataPacketType.ALPHA_RELATIVE:
+        buffer = this.dataBuffers.alphaRelative;
+        break;
+      case DataPacketType.BETA_RELATIVE:
+        buffer = this.dataBuffers.betaRelative;
+        break;
+      case DataPacketType.DELTA_RELATIVE:
+        buffer = this.dataBuffers.deltaRelative;
+        break;
+      case DataPacketType.THETA_RELATIVE:
+        buffer = this.dataBuffers.thetaRelative;
+        break;
+      case DataPacketType.GAMMA_RELATIVE:
+        buffer = this.dataBuffers.gammaRelative;
+        break;
+      // Band power - Scores
+      case DataPacketType.ALPHA_SCORE:
+        buffer = this.dataBuffers.alphaScore;
+        break;
+      case DataPacketType.BETA_SCORE:
+        buffer = this.dataBuffers.betaScore;
+        break;
+      case DataPacketType.DELTA_SCORE:
+        buffer = this.dataBuffers.deltaScore;
+        break;
+      case DataPacketType.THETA_SCORE:
+        buffer = this.dataBuffers.thetaScore;
+        break;
+      case DataPacketType.GAMMA_SCORE:
+        buffer = this.dataBuffers.gammaScore;
+        break;
+      // Quality indicators
       case DataPacketType.HSI_PRECISION:
         buffer = this.dataBuffers.hsi;
+        break;
+      case DataPacketType.IS_GOOD:
+        buffer = this.dataBuffers.isGood;
+        break;
+      case DataPacketType.ARTIFACTS:
+        buffer = this.dataBuffers.artifacts;
+        break;
+      // Derived EEG values
+      case DataPacketType.NOTCH_FILTERED_EEG:
+        buffer = this.dataBuffers.notchFilteredEeg;
+        break;
+      case DataPacketType.VARIANCE_EEG:
+        buffer = this.dataBuffers.varianceEeg;
+        break;
+      case DataPacketType.VARIANCE_NOTCH_FILTERED_EEG:
+        buffer = this.dataBuffers.varianceNotchFilteredEeg;
         break;
       default:
         return;
@@ -513,6 +743,67 @@ export class MuseTrackerCore extends EventEmitter implements IMuseTracker {
    * Only registers EEG, OPTICS (for heart rate), and BATTERY listeners.
    * Accelerometer and Gyro are omitted to save battery.
    */
+  /**
+   * Start streaming all data types for ML analysis.
+   * Registers listeners for all Muse S 2025 supported data:
+   * - Raw sensors (EEG, Accelerometer, Gyro, Optics, Battery, DRL_REF)
+   * - All frequency band powers (Alpha, Beta, Delta, Theta, Gamma - Absolute, Relative, Scores)
+  * - Quality indicators (HSI_PRECISION, IS_GOOD, ARTIFACTS)
+   * - Derived EEG values (Notch Filtered, Variance)
+   */
+  /**
+   * Register all data listeners - MUST be called before runAsynchronously()
+   * The SDK needs to know what data types to compute before starting the processing loop
+   */
+  private registerAllDataListeners(): void {
+    if (!this.connectedMuse) {
+      throw new Error('No Muse device available for listener registration');
+    }
+
+    this.log('Registering all data listeners for ML analysis...');
+    
+    // Raw sensor data
+    this.registerDataListener(DataPacketType.EEG);
+    this.registerDataListener(DataPacketType.ACCELEROMETER);
+    this.registerDataListener(DataPacketType.GYRO);
+    this.registerDataListener(DataPacketType.OPTICS);
+    this.registerDataListener(DataPacketType.BATTERY);
+    this.registerDataListener(DataPacketType.DRL_REF);
+
+    // Band power - Absolute
+    this.registerDataListener(DataPacketType.ALPHA_ABSOLUTE);
+    this.registerDataListener(DataPacketType.BETA_ABSOLUTE);
+    this.registerDataListener(DataPacketType.DELTA_ABSOLUTE);
+    this.registerDataListener(DataPacketType.THETA_ABSOLUTE);
+    this.registerDataListener(DataPacketType.GAMMA_ABSOLUTE);
+
+    // Band power - Relative (best for ML - normalized 0-1)
+    this.registerDataListener(DataPacketType.ALPHA_RELATIVE);
+    this.registerDataListener(DataPacketType.BETA_RELATIVE);
+    this.registerDataListener(DataPacketType.DELTA_RELATIVE);
+    this.registerDataListener(DataPacketType.THETA_RELATIVE);
+    this.registerDataListener(DataPacketType.GAMMA_RELATIVE);
+
+    // Band power - Scores (percentile-based)
+    this.registerDataListener(DataPacketType.ALPHA_SCORE);
+    this.registerDataListener(DataPacketType.BETA_SCORE);
+    this.registerDataListener(DataPacketType.DELTA_SCORE);
+    this.registerDataListener(DataPacketType.THETA_SCORE);
+    this.registerDataListener(DataPacketType.GAMMA_SCORE);
+
+    // Quality indicators
+    this.registerDataListener(DataPacketType.HSI_PRECISION);
+    this.registerDataListener(DataPacketType.IS_GOOD);
+    this.registerDataListener(DataPacketType.ARTIFACTS);
+
+    // Derived EEG values
+    this.registerDataListener(DataPacketType.NOTCH_FILTERED_EEG);
+    this.registerDataListener(DataPacketType.VARIANCE_EEG);
+    this.registerDataListener(DataPacketType.VARIANCE_NOTCH_FILTERED_EEG);
+
+    this.log('All data listeners registered (42 packet types)');
+  }
+
   public startStreaming(): void {
     if (!this.connectedMuse) {
       const err = 'No Muse device connected';
@@ -520,22 +811,14 @@ export class MuseTrackerCore extends EventEmitter implements IMuseTracker {
       throw new Error(err);
     }
 
-    this.log('startStreaming() called - registering data listeners (battery-optimized)...');
+    // Data listeners are already registered in connect() before runAsynchronously()
+    // This method now just enables data transmission
+    this.log('startStreaming() - data listeners already registered, enabling transmission...');
     try {
-      this.registerDataListener(DataPacketType.EEG);
-      this.log('EEG listener registered');
-      this.registerDataListener(DataPacketType.OPTICS);
-      this.log('OPTICS listener registered (for heart rate)');
-      this.registerDataListener(DataPacketType.BATTERY);
-      this.log('Battery listener registered');
-      this.registerDataListener(DataPacketType.HSI_PRECISION);
-      this.log('HSI_PRECISION listener registered (signal quality)');
-
-      this.log('Calling enableDataTransmission(true)...');
       this.connectedMuse.enableDataTransmission(true);
-      this.log('enableDataTransmission(true) completed - NOW WAITING FOR DATA');
+      this.log('Data transmission enabled - all streams active');
     } catch (err) {
-      this.logError('ERROR in startStreaming():', err);
+      this.logError('ERROR enabling data transmission:', err);
       throw err;
     }
   }
