@@ -57,9 +57,9 @@
                 <span
                   class="badge badge-sm"
                   :class="{
-                    'badge-success': row.signalQuality !== undefined && row.signalQuality >= 3,
+                    'badge-success': row.signalQuality !== undefined && row.signalQuality <= 1,
                     'badge-warning': row.signalQuality === 2,
-                    'badge-error': row.signalQuality !== undefined && row.signalQuality < 2
+                    'badge-error': row.signalQuality !== undefined && row.signalQuality >= 3
                   }"
                 >
                   {{ row.signalQuality ?? 'N/A' }}/4

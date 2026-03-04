@@ -90,7 +90,7 @@ export class WindowService {
       fullscreenable: false,
       resizable: false,
       acceptFirstMouse: true,
-      title: 'PersonalAnalytics: Self-Reflection',
+      title: 'Muselytics: Self-Reflection',
       webPreferences: {
         preload
       }
@@ -153,7 +153,7 @@ export class WindowService {
       maximizable: false,
       fullscreenable: false,
       resizable: false,
-      title: 'PersonalAnalytics: Settings',
+      title: 'Muselytics: Settings',
       webPreferences: {
         preload
       }
@@ -202,7 +202,7 @@ export class WindowService {
       maximizable: false,
       fullscreenable: false,
       resizable: false,
-      title: 'PersonalAnalytics: Onboarding',
+      title: 'Muselytics: Onboarding',
       webPreferences: {
         preload
       }
@@ -269,7 +269,7 @@ export class WindowService {
       maximizable: false,
       fullscreenable: false,
       resizable: true,
-      title: 'PersonalAnalytics: Muse Tracking',
+      title: 'Muselytics: Muse Tracking',
       webPreferences: {
         preload
       }
@@ -313,7 +313,7 @@ export class WindowService {
       minWidth: 1200,
       minHeight: 850,
       fullscreenable: false,
-      title: 'PersonalAnalytics: Data Export',
+      title: 'Muselytics: Data Export',
       webPreferences: {
         preload
       }
