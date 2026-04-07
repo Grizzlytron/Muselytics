@@ -9,6 +9,16 @@ const router: Router = createRouter({
       component: () => import('../views/ExperienceSamplingView.vue')
     },
     {
+      path: '/muse',
+      name: 'Muse',
+      component: () => import('../views/MuseView.vue')
+    },
+    {
+      path: '/n-back',
+      name: 'NBack',
+      component: () => import('../views/NBackView.vue')
+    },
+    {
       path: '/onboarding',
       name: 'Onboarding',
       component: () => import('../views/OnboardingView.vue'),
@@ -34,6 +44,11 @@ const router: Router = createRouter({
           path: '/work-hours',
           name: 'Active Times',
           component: () => import('../views/settings/WorkHoursView.vue')
+        },
+        {
+          path: '/self-reporting',
+          name: 'Self-Reporting',
+          component: () => import('../views/settings/SelfReportingView.vue')
         }
       ]
     },

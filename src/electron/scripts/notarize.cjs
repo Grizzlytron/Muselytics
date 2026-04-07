@@ -1,22 +1,24 @@
-const { notarize } = require("@electron/notarize");
+const { notarize } = require('@electron/notarize');
 
 exports.default = async function notarizeMacos(context) {
   const { electronPlatformName, appOutDir } = context;
-  if (electronPlatformName !== "darwin") {
+  if (electronPlatformName !== 'darwin') {
     return;
   }
-  console.info("Starting notarization step.");
+  console.info('Starting notarization step.');
 
   if (!process.env.CI) {
-    console.warn("Skipping notarizing step. Packaging is not running in CI");
+    console.warn('Skipping notarizing step. Packaging is not running in CI');
     return;
   }
 
   if (
-    !("APPLE_ID" in process.env && "APPLE_APP_SPECIFIC_PASSWORD" in process.env)
+    !process.env.APPLE_ID ||
+    !process.env.APPLE_APP_SPECIFIC_PASSWORD ||
+    !process.env.APPLE_TEAM_ID
   ) {
     console.warn(
-      "Skipping notarizing step. APPLE_ID and APPLE_APP_SPECIFIC_PASSWORD env variables must be set",
+      'Skipping notarizing step. APPLE_ID, APPLE_APP_SPECIFIC_PASSWORD, and APPLE_TEAM_ID must be set'
     );
     return;
   }
@@ -25,10 +27,10 @@ exports.default = async function notarizeMacos(context) {
 
   // These environment variables are set in the GitHub Actions secrets
   await notarize({
-    tool: "notarytool",
+    tool: 'notarytool',
     appPath: `${appOutDir}/${appName}.app`,
     appleId: process.env.APPLE_ID,
     appleIdPassword: process.env.APPLE_APP_SPECIFIC_PASSWORD,
-    teamId: process.env.APPLE_TEAM_ID,
+    teamId: process.env.APPLE_TEAM_ID
   });
 };

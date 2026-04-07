@@ -25,12 +25,52 @@ export interface ExperienceSamplingTrackerConfiguration {
   // The experience sampling will be triggered between 54 and 66 minutes
   // After app startup or the last experience sampling
   samplingRandomization: number;
+  allowUserToDisable?: boolean;
+  allowUserToChangeInterval?: boolean;
+  userDefinedInterval_h?: number[];
+}
+
+export interface MuseTrackerConfiguration {
+  enabled: boolean;
+  intervalInMs: number;
+  autoConnect: boolean;
+}
+
+export interface TaskTrackerConfiguration {
+  enabled: boolean;
+}
+
+export interface NBackTaskDefinition {
+  n: number;
+  withDistractions?: boolean;
+  totalTrials?: number;
+}
+
+export interface NBackReflectionQuestionConfiguration {
+  id: string;
+  text: string;
+  minLabel: string;
+  midLabel: string;
+  maxLabel: string;
+}
+
+export interface NBackInterfaceConfiguration {
+  enabled: boolean;
+  title: string;
+  description: string;
+  scale: number;
+  tasks: NBackTaskDefinition[];
+  reflectionQuestions: NBackReflectionQuestionConfiguration[];
+  distractionDotCount?: number;
+  randomizeTasksAfterFirstLevel?: boolean;
 }
 
 export interface TrackerConfiguration {
   windowActivityTracker: WindowActivityTrackerConfiguration;
   userInputTracker: UserInputTrackerConfiguration;
   experienceSamplingTracker: ExperienceSamplingTrackerConfiguration;
+  museTracker: MuseTrackerConfiguration;
+  taskTracker?: TaskTrackerConfiguration;
 }
 
 export interface StudyConfiguration {
@@ -45,6 +85,9 @@ export interface StudyConfiguration {
   dataExportEnabled: boolean;
   dataExportEncrypted: boolean;
   dataExportFormat: DataExportFormat;
+  dataExportDDLProjectName?: string;
   trackers: TrackerConfiguration;
+  nBackInterface?: NBackInterfaceConfiguration;
   displayDaysParticipated: boolean;
+  showActiveTimesInOnboarding?: boolean;
 }

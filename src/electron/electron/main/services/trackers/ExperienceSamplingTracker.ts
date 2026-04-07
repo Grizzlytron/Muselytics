@@ -4,8 +4,9 @@ import { Tracker } from './Tracker';
 import getMainLogger from '../../../config/Logger';
 import { Settings } from '../../entities/Settings';
 import { powerMonitor } from 'electron';
-import { WorkScheduleService } from '../WorkScheduleService'
-import studyConfig from '../../../../shared/study.config'
+import { WorkScheduleService } from '../WorkScheduleService';
+import studyConfig from '../../../../shared/study.config';
+import { DataSource } from 'typeorm';
 
 const LOG = getMainLogger('ExperienceSamplingTracker');
 
@@ -17,15 +18,40 @@ export class ExperienceSamplingTracker implements Tracker {
   private readonly intervalInMs: number;
   private readonly samplingRandomization: number;
 
-  public readonly name: string = 'ExperienceSamplingTracker';
+  public readonly name: string = 'Experience Sampling';
   public isRunning: boolean = false;
 
-  constructor(windowService: WindowService, workScheduleService: WorkScheduleService, intervalInMs: number, samplingRandomization: number) {
+  constructor(
+    windowService: WindowService,
+    workScheduleService: WorkScheduleService,
+    intervalInMs: number,
+    samplingRandomization: number
+  ) {
     this.windowService = windowService;
     this.workScheduleService = workScheduleService;
     this.intervalInMs = intervalInMs;
     this.samplingRandomization = samplingRandomization;
   }
+
+  private async isUserDisabled(): Promise<boolean> {
+    const settings: Settings = await Settings.findOneBy({ onlyOneEntityShouldExist: 1 });
+    return (settings?.userDisabledExperienceSampling ?? 0) === 1;
+  }
+
+  private async getEffectiveIntervalMs(): Promise<number> {
+    const allowChange =
+      (studyConfig.trackers.experienceSamplingTracker.allowUserToChangeInterval ?? true) === true;
+    if (allowChange) {
+      const settings: Settings = await Settings.findOneBy({ onlyOneEntityShouldExist: 1 });
+      const h = settings?.userDefinedExperienceSamplingInterval_h;
+      LOG.debug(`User defined experience sampling interval in hours: ${h}`);
+      if (h != null && h !== 0 && Number.isFinite(h)) {
+        return h * 60 * 60 * 1000; // hours → ms
+      }
+    }
+    return this.intervalInMs;
+  }
+
   public async start(): Promise<void> {
     try {
       await this.scheduleNextJob();
@@ -70,24 +96,35 @@ export class ExperienceSamplingTracker implements Tracker {
 
   private async handleExperienceSamplingJob(fireDate: Date): Promise<void> {
     LOG.info(`Experience Sampling Job was supposed to fire at ${fireDate}, fired at ${new Date()}`);
+
+    const disabled = await this.isUserDisabled();
+    if (disabled) {
+      LOG.info('Experience sampling is disabled by user; not opening popup.');
+      await this.scheduleNextJob();
+      return;
+    }
+
     // check if we can safely fire the experience sampling job
     // or have to consider work hours based on user settings and time/weekday
-    const settings: Settings = await Settings.findOneBy({ onlyOneEntityShouldExist: 1 });  
+    const settings: Settings = await Settings.findOneBy({ onlyOneEntityShouldExist: 1 });
     const userConsiderWorkHours = settings.enabledWorkHours;
-    const inWorkHours = await this.workScheduleService.currentlyWithinWorkHours();
     const considerWorkHours = studyConfig.trackers.experienceSamplingTracker.enabledWorkHours;
-    if (userConsiderWorkHours && considerWorkHours && !inWorkHours) {
+    if (userConsiderWorkHours && considerWorkHours) {
+      const inWorkHours = await this.workScheduleService.currentlyWithinWorkHours();
+      if (!inWorkHours) {
         LOG.info('Currently outside of work hours, abort firing');
-    } else {
-      // within work hours; start experience sampling
-      await this.windowService.createExperienceSamplingWindow();
+        await this.scheduleNextJob();
+        return;
+      }
     }
+    // within work hours or work hours not enforced; start experience sampling
+    await this.windowService.createExperienceSamplingWindow();
     // keep schedule for next experience sampling job no matter what..
     await this.scheduleNextJob();
   }
 
   private async scheduleNextJob(): Promise<void> {
-    const nextInvocation: Date = this.getRandomNextInvocationDate();
+    const nextInvocation: Date = await this.getRandomNextInvocationDate();
     const settings: Settings = await Settings.findOneBy({ onlyOneEntityShouldExist: 1 });
     settings.nextExperienceSamplingInvocation = nextInvocation;
     await settings.save();
@@ -126,15 +163,16 @@ export class ExperienceSamplingTracker implements Tracker {
     await this.startExperienceSamplingJob();
   }
 
-  private getRandomNextInvocationDate(): Date {
+  private async getRandomNextInvocationDate(): Promise<Date> {
+    const effectiveIntervalMs = await this.getEffectiveIntervalMs();
     const subtractOrAdd: 1 | -1 = Math.random() < 0.5 ? -1 : 1;
     const randomization =
-      this.intervalInMs * this.samplingRandomization * Math.random() * subtractOrAdd;
+      effectiveIntervalMs * this.samplingRandomization * Math.random() * subtractOrAdd;
     LOG.debug(
-      `intervalInMs: ${this.intervalInMs}, samplingRandomization: ${this.samplingRandomization}, subtractOrAdd: ${subtractOrAdd}`
+      `effectiveIntervalMs: ${effectiveIntervalMs}, samplingRandomization: ${this.samplingRandomization}, subtractOrAdd: ${subtractOrAdd}`
     );
     LOG.debug(`Randomization: ${randomization} (${randomization / 1000 / 60} minutes)`);
-    const nextInvocation = new Date(Date.now() + this.intervalInMs + randomization);
+    const nextInvocation = new Date(Date.now() + effectiveIntervalMs + randomization);
     LOG.debug(`Next invocation: ${nextInvocation}`);
     return nextInvocation;
   }

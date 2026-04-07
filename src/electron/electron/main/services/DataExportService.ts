@@ -5,6 +5,7 @@ import path from 'path';
 import { app } from 'electron';
 import { is } from './utils/helpers';
 import fs from 'node:fs';
+import { File, Blob } from 'node:buffer';
 import Database from 'better-sqlite3-multiple-ciphers';
 import { WindowActivityEntity } from '../entities/WindowActivityEntity';
 import { WindowActivityTrackerService } from './trackers/WindowActivityTrackerService';
@@ -13,8 +14,6 @@ import { UsageDataService } from './UsageDataService';
 import { UsageDataEventType } from '../../enums/UsageDataEventType.enum';
 import { DataExportFormat } from '../../../shared/DataExportFormat.enum';
 import archiver from 'archiver';
-import axios from 'axios';
-import FormData from 'form-data';
 
 const LOG = getMainLogger('DataExportService');
 
@@ -27,6 +26,7 @@ export class DataExportService {
     obfuscationTerms: string[],
     encryptData: boolean,
     exportFormat: DataExportFormat,
+    exportToDDLProjectName?: string
   ): Promise<{ fullPath: string; fileName: string }> {
     LOG.info(`startDataExport called with ${exportFormat}`);
     await UsageDataService.createNewUsageDataEvent(
@@ -68,19 +68,22 @@ export class DataExportService {
           windowActivityExportType,
           userInputExportType,
           obfuscationTerms,
-          encryptData
+          encryptData,
+          exportToDDLProjectName
         );
       } else {
         throw new Error(`Unsupported export format: ${exportFormat}`);
       }
 
-      await UsageDataService.createNewUsageDataEvent(UsageDataEventType.FinishExport, JSON.stringify({exportFormat}));
+      await UsageDataService.createNewUsageDataEvent(
+        UsageDataEventType.FinishExport,
+        JSON.stringify({ exportFormat })
+      );
 
       return {
-        fullPath: exportPath, 
-        fileName: path.basename(exportPath) 
+        fullPath: exportPath,
+        fileName: path.basename(exportPath)
       };
-
     } catch (error) {
       LOG.error(`Error exporting the data as ${exportFormat}`, error);
       throw error;
@@ -91,9 +94,8 @@ export class DataExportService {
     windowActivityExportType: DataExportType,
     userInputExportType: DataExportType,
     obfuscationTerms: string[],
-    encryptData: boolean,
+    encryptData: boolean
   ): Promise<string> {
-
     const dbName = 'database.sqlite';
     let dbPath = dbName;
     if (!(is.dev && process.env['VITE_DEV_SERVER_URL'])) {
@@ -110,7 +112,11 @@ export class DataExportService {
     }
     const now = new Date();
     const nowStr = now.toISOString().replace(/:/g, '-').replace('T', '_').slice(0, 16);
-    const exportDbPath = path.join(userDataPath, 'exports', `PA_${settings.subjectId}_${nowStr}.sqlite`);
+    const exportDbPath = path.join(
+      userDataPath,
+      'exports',
+      `PA_${settings.subjectId}_${nowStr}.sqlite`
+    );
     fs.copyFileSync(dbPath, exportDbPath);
     LOG.info(`Database copied to ${exportDbPath}`);
     const db = new Database(exportDbPath);
@@ -194,7 +200,7 @@ export class DataExportService {
     windowActivityExportType: DataExportType,
     userInputExportType: DataExportType,
     obfuscationTerms: string[],
-    encryptData: boolean,
+    encryptData: boolean
   ): Promise<string> {
     const sqlitePath = await this.exportToSqlite(
       windowActivityExportType,
@@ -210,7 +216,7 @@ export class DataExportService {
     return new Promise<string>((resolve, reject) => {
       zipOutput.on('close', () => {
         LOG.info(`Exported and zipped to ${zipPath} (${archive.pointer()} total bytes)`);
-  
+
         // Delete the original .sqlite file after zipping
         fs.unlink(sqlitePath, (err) => {
           if (err) {
@@ -221,11 +227,11 @@ export class DataExportService {
           resolve(zipPath);
         });
       });
-  
+
       archive.on('error', (err) => {
         reject(err);
       });
-  
+
       archive.pipe(zipOutput);
       archive.file(sqlitePath, { name: path.basename(sqlitePath) });
       archive.finalize();
@@ -236,7 +242,7 @@ export class DataExportService {
     windowActivityExportType: DataExportType,
     userInputExportType: DataExportType,
     obfuscationTerms: string[],
-    encryptData: boolean,
+    encryptData: boolean
   ): Promise<string> {
     const sqlitePath = await this.exportToSqlite(
       windowActivityExportType,
@@ -249,12 +255,13 @@ export class DataExportService {
     const userDataPath = app.getPath('userData');
     const exportFolderPath = path.join(userDataPath, 'exports');
     const tempJsonFiles: string[] = [];
-    
+
     // create database and read all tables
     const db = new Database(sqlitePath);
-    const tables = db.prepare(
-      "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%';"
-    ).all().map((row: any) => row.name);
+    const tables = db
+      .prepare("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%';")
+      .all()
+      .map((row: any) => row.name);
 
     // create json file for each table
     for (const table of tables) {
@@ -304,8 +311,8 @@ export class DataExportService {
     userInputExportType: DataExportType,
     obfuscationTerms: string[],
     encryptData: boolean,
+    dataExportDDLProjectName: string
   ): Promise<string> {
-
     if (net.isOnline()) {
       const zipPath = await this.exportAsZippedJson(
         windowActivityExportType,
@@ -313,42 +320,67 @@ export class DataExportService {
         obfuscationTerms,
         encryptData
       );
-  
-      const projectId = process.env.DDL_PROJECT_ID || 'add for debugging'; // set in Github Secrets
-      const projectToken = process.env.DDL_PROJECT_TOKEN || 'add for debugging'; // set in Github Secrets (expires after maximum of 90d)
-      const url = `https://datadonation.uzh.ch/api/zip/${projectId}`;
-  
-      const form = new FormData();
-      form.append('file', fs.createReadStream(zipPath));
-  
+
+      // we are using our proxy to forward the data to DDL (to avoid exposing secrets in the client)
+      const proxyUrl = 'https://pa-upload.hasel.dev/upload_to_ddl.php';
+      const clientKey = dataExportDDLProjectName;
+      const maxBytes = 199 * 1024 * 1024; // server accepts a maximum of 200 MB
+
       try {
-        const response = await axios.post(url, form, {
-          headers: {
-            ...form.getHeaders(),
-            Authorization: `Token ${projectToken}`,
-          },
-          maxContentLength: Infinity,
-          maxBodyLength: Infinity,
-        });
-        
-        if (response.status !== 201) {
-          throw new Error(`Failed to upload to DDL: ${response.statusText}`);
+        // Check size before reading into memory / uploading
+        const { size } = await fs.promises.stat(zipPath);
+        if (size > maxBytes) {
+          const mib = (size / (1024 * 1024)).toFixed(1);
+          throw new Error(`Export is too large (${mib} MB). The upload limit is 256 MB.`);
         }
-        LOG.info(`Uploaded to DDL: status ${response.status}, response: ${response.data}`);
-  
+
+        const buffer = await fs.promises.readFile(zipPath);
+        const blob = new Blob([buffer], { type: 'application/zip' });
+        const form = new FormData();
+        form.append('file', blob, path.basename(zipPath));
+
+        const response = await fetch(proxyUrl, {
+          method: 'POST',
+          headers: { 'X-Client-Key': clientKey },
+          body: form
+        });
+
+        // Proxy response is standardized (and in json)
+        const data = await response.json();
+
+        // Error on Proxy Side
+        if (!response.ok) {
+          LOG.error(
+            `Upload via proxy failed: HTTP ${response.status} ${response.statusText}`,
+            data
+          );
+          throw new Error(data.message || data.error || 'Upload via proxy failed');
+        }
+
+        // Error on DDL Side
+        if (data.ok === false) {
+          LOG.error(`DDL upload failed via proxy: ddl_status=${data.ddl_status ?? 'n/a'}`, data);
+          throw new Error(data.message || 'DDL upload failed');
+        }
+
+        // Successful upload
+        LOG.info(
+          `Uploaded to DDL via proxy: proxy_status=${response.status}, ddl_status=${data?.ddl_status ?? 'n/a'}`
+        );
+
         // option to delete the zip file after upload (but we're keeping it for now)
         // fs.unlink(zipPath, (err) => {
         //   if (err) LOG.warn(`Failed to delete temporary zipped json file: ${zipPath}`, err);
         // });
-  
+
         return zipPath;
       } catch (error) {
-        LOG.error(`Failed to upload to DDL`, error);
+        LOG.error(`Failed to upload to DDL via proxy`, error);
         throw error;
       }
     } else {
-      LOG.info("No internet connection, skipping upload to DDL.");
-      throw new Error("No internet connection, skipping upload to DDL."); 
+      LOG.info('No internet connection, skipping upload to DDL.');
+      throw new Error('No internet connection, skipping upload to DDL.');
     }
   }
 }

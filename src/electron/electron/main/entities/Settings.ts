@@ -43,9 +43,21 @@ export class Settings extends BaseEntity {
   @Column('datetime', { nullable: true })
   nextExperienceSamplingInvocation: Date;
 
-  @CreateDateColumn({ name: 'created_at' })
+  @CreateDateColumn({
+    name: 'created_at',
+    type: 'datetime'
+  })
   createdAt: Date;
 
-  @UpdateDateColumn({ name: 'updated_at' })
+  @UpdateDateColumn({
+    name: 'updated_at',
+    type: 'datetime'
+  })
   updatedAt: Date;
+
+  @Column({ type: 'integer', default: 0 })
+  userDisabledExperienceSampling: number;
+
+  @Column({ type: 'float', nullable: true })
+  userDefinedExperienceSamplingInterval_h: number | null;
 }

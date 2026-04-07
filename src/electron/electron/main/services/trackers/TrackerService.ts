@@ -1,6 +1,6 @@
 import * as schedule from 'node-schedule';
 import { Tracker } from './Tracker';
-import { TrackerConfig } from '../../../types/StudyConfig';
+import { TrackerConfiguration } from '../../../../shared/StudyConfiguration';
 import { TrackerType } from '../../../enums/TrackerType.enum';
 import getMainLogger from '../../../config/Logger';
 import { ExperienceSamplingTracker } from './ExperienceSamplingTracker';
@@ -8,20 +8,27 @@ import { WindowService } from '../WindowService';
 import studyConfig from '../../../../shared/study.config';
 import { UserInputEntity } from '../../entities/UserInputEntity';
 import { MoreThanOrEqual } from 'typeorm';
-import { WorkScheduleService } from '../WorkScheduleService'
-import { DaysParticipatedTracker } from './DaysParticipatedTracker'
+import { WorkScheduleService } from '../WorkScheduleService';
+import { DaysParticipatedTracker } from './DaysParticipatedTracker';
+import { MuseTracker } from './MuseTracker';
+import { MuseTrackerService } from './MuseTrackerService';
 
 const LOG = getMainLogger('TrackerService');
 
 export class TrackerService {
   private trackers: Tracker[] = [];
-  private readonly config: TrackerConfig;
+  private readonly config: TrackerConfiguration;
   private readonly windowService: WindowService;
   private readonly workScheduleService: WorkScheduleService;
   private checkIfUITIsWorkingJob: schedule.Job;
+  private manuallyStartedTrackerNames: Set<string> = new Set();
 
-  constructor(trackerConfig: TrackerConfig, windowService: WindowService, workScheduleService: WorkScheduleService) {
-    this.config = trackerConfig;
+  constructor(
+    TrackerConfiguration: TrackerConfiguration,
+    windowService: WindowService,
+    workScheduleService: WorkScheduleService
+  ) {
+    this.config = TrackerConfiguration;
     this.windowService = windowService;
     this.workScheduleService = workScheduleService;
     LOG.debug(`TrackerService.constructor: config=${JSON.stringify(this.config)}`);
@@ -77,6 +84,9 @@ export class TrackerService {
     } else if (trackerType === TrackerType.DaysParticipatedTracker) {
       const daysParticipatedTracker = new DaysParticipatedTracker();
       this.trackers.push(daysParticipatedTracker);
+    } else if (this.config.museTracker.enabled && trackerType === TrackerType.MuseTracker) {
+      const museTracker: MuseTracker = new MuseTracker(this.config.museTracker.intervalInMs);
+      this.trackers.push(museTracker);
     } else {
       throw new Error(`Tracker ${trackerType} not enabled or unsupported!`);
     }
@@ -116,7 +126,10 @@ export class TrackerService {
 
   public async startAllTrackers() {
     await Promise.all(
-      this.trackers.filter((t: Tracker) => !t.isRunning).map((t: Tracker) => t.start())
+      this.trackers
+        .filter((t: Tracker) => !t.isRunning)
+        .filter((t: Tracker) => this.shouldAutoStartTracker(t))
+        .map((t: Tracker) => t.start())
     );
     this.setCheckIfUITIsWorkingJob();
   }
@@ -125,8 +138,35 @@ export class TrackerService {
     await Promise.all(
       this.trackers
         .filter((t: Tracker) => !t.isRunning)
+        .filter((t: Tracker) => this.shouldResumeTracker(t))
         .map((t: Tracker): void => (t.resume ? t.resume() : t.start()))
     );
+  }
+
+  public async startTracker(name: string): Promise<void> {
+    const tracker = this.getTracker(name);
+    if (!tracker) {
+      throw new Error(`Tracker ${name} not found`);
+    }
+
+    if (!tracker.isRunning) {
+      await (tracker.resume ? tracker.resume() : tracker.start());
+    }
+
+    this.manuallyStartedTrackerNames.add(name);
+  }
+
+  public async stopTracker(name: string): Promise<void> {
+    const tracker = this.getTracker(name);
+    if (!tracker) {
+      throw new Error(`Tracker ${name} not found`);
+    }
+
+    if (tracker.isRunning) {
+      await tracker.stop();
+    }
+
+    this.manuallyStartedTrackerNames.delete(name);
   }
 
   public async stopAllTrackers() {
@@ -143,11 +183,31 @@ export class TrackerService {
     return this.trackers.filter((t: Tracker) => t.isRunning).map((t: Tracker) => t.name);
   }
 
+  public getTracker(name: string): Tracker | undefined {
+    return this.trackers.find((t: Tracker) => t.name === name);
+  }
+
   public isAnyTrackerRunning() {
     return this.trackers.some((t: Tracker) => t.isRunning);
   }
 
   private isTrackerAlreadyRegistered(trackerType: TrackerType) {
     return this.trackers.some((t: Tracker) => t.name === trackerType);
+  }
+
+  private shouldAutoStartTracker(tracker: Tracker): boolean {
+    return !this.isManualStartTracker(tracker.name);
+  }
+
+  private shouldResumeTracker(tracker: Tracker): boolean {
+    if (!this.isManualStartTracker(tracker.name)) {
+      return true;
+    }
+
+    return this.manuallyStartedTrackerNames.has(tracker.name);
+  }
+
+  private isManualStartTracker(trackerName: string): boolean {
+    return trackerName === TrackerType.MuseTracker;
   }
 }

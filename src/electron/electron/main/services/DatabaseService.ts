@@ -8,7 +8,11 @@ import { ExperienceSamplingResponseEntity } from '../entities/ExperienceSampling
 import { UserInputEntity } from '../entities/UserInputEntity';
 import { Settings } from '../entities/Settings';
 import { UsageDataEntity } from '../entities/UsageDataEntity';
-import { WorkDayEntity } from '../entities/WorkDayEntity'
+import { WorkDayEntity } from '../entities/WorkDayEntity';
+import { MuseRawEegEntity } from '../entities/MuseRawEegEntity';
+import { MuseRawOpticsEntity } from '../entities/MuseRawOpticsEntity';
+import { MuseMetadataEntity } from '../entities/MuseMetadataEntity';
+import { NBackTaskBlockEntity } from '../entities/NBackTaskBlockEntity';
 
 const LOG = getMainLogger('DatabaseService');
 
@@ -25,7 +29,7 @@ export class DatabaseService {
     }
     LOG.info('Using database path:', this.dbPath);
   }
-  
+
   public async init(): Promise<void> {
     let entities: any = [
       ExperienceSamplingResponseEntity,
@@ -33,17 +37,21 @@ export class DatabaseService {
       UsageDataEntity,
       UserInputEntity,
       WindowActivityEntity,
-      WorkDayEntity
-    ]
-    
+      WorkDayEntity,
+      MuseRawEegEntity,
+      MuseRawOpticsEntity,
+      MuseMetadataEntity,
+      NBackTaskBlockEntity
+    ];
+
     let options: DataSourceOptions = {
       type: 'better-sqlite3',
       database: this.dbPath,
       synchronize: true,
       logging: false,
-      entities: entities,
+      entities: entities
     };
-    
+
     this.dataSource = new DataSource(options);
 
     try {

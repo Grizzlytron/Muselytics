@@ -1,4 +1,6 @@
-# PersonalAnalytics - Privacy-protecting, open-source Self-Monitoring Software
+# Muselytics - Privacy-protecting, open-source Self-Monitoring Software
+
+Muselytics is Lucas\' version of PersonalAnalytics, which integrates a Muse S Athena (2025) tracker into PersonalAnalytics and extends the self-monitoring software developed by the Human Aspects of Software Engineering Lab of the University of Zurich to non-intrusively collect computer interaction data and store it locally on your computer. Every now and then, a self-reflection question asks you about time well spent and perceived productivity. In the future, it will add a retrospection that will visualize and correlate the automatically collected and manually reported data to help you learn more about how you spend your time and your productivity. This software is open source, can be adapted and re-used for your own scientific studies.
 
 PersonalAnalytics is a self-monitoring software developed by the [Human Aspects of Software Engineering Lab](https://hasel.dev) of [the University of Zurich](https://www.uzh.ch) to non-intrusively collect computer interaction data and user's self-reports, store it locally on the user's machine, and allow users to voluntarily share a user-defined and potentially obfuscated subset of the data with researchers for scientific purposes.
 
@@ -39,8 +41,9 @@ In 2024, we've revived the project in creating a multi-platform app using TypeSc
 This work is carried by the following main contributors: 
 - [Dr. André Meyer](https://www.andre-meyer.ch) (University of Zurich, main contributor to the project)
 - [Prof. Dr. Thomas Fritz](http://www.ifi.uzh.ch/en/seal/people/fritz.html) (University of Zurich)
-- [Sebastian Richner](https://github.com/SRichner) (contributor to new version)
-- [Roy Rutishauser](https://github.com/royru) (contributor to MacOS-legacy version)
+- [Roy Rutishauser](https://github.com/royru) (contributor)
+- [Grigor Dochev](https://github.com/grigor-dochev) (contributor)
+- [Sebastian Richner](https://github.com/SRichner) (contributor)
 - [Chris Satterfield](https://github.com/csatterfield) (contributor to MacOS-legacy version)
 - [Jan Pilzer](https://github.com/hirse) (contributor to Windows-legacy version)
 - [Alexander Lill](https://github.com/alexanderlill) (tester)
