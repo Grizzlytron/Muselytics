@@ -1,6 +1,30 @@
 const enableAzureSigning = process.env.ENABLE_AZURE_SIGNING === 'true';
 const enableMacSigning = process.env.ENABLE_NOTARIZE === 'true';
 
+const museCoreResources = [
+  {
+    from: 'PA.MuseTracker',
+    to: 'muse-native',
+    filter: ['muse_native.node', 'build/Release/muse_native.node']
+  }
+];
+
+const museWindowsRuntimeResources = [
+  {
+    from: 'PA.MuseTracker/deps/libmuse/lib/release',
+    to: 'muse-native',
+    filter: ['**/libmuse.dll']
+  }
+];
+
+const museMacRuntimeResources = [
+  {
+    from: 'PA.MuseTracker/deps/libmuse/lib/release',
+    to: 'muse-native',
+    filter: ['**/libmuse.dylib', '**/Muse.framework/**']
+  }
+];
+
 module.exports = {
   productName: 'PersonalAnalytics (Musified)',
   appId: 'ch.ifi.hasel.personal-analytics',
@@ -20,6 +44,7 @@ module.exports = {
     identity: null,  
     artifactName: '${productName}-${version}-${arch}.${ext}',
     asarUnpack: ['node_modules/**/*.node'],
+    extraResources: [...museCoreResources, ...museMacRuntimeResources],
     // entitlements: 'build/entitlements.mac.plist',
     // entitlementsInherit: 'build/entitlements.mac.plist',
     hardenedRuntime: false,
@@ -46,6 +71,7 @@ module.exports = {
   win: {
     target: ['nsis'],
     verifyUpdateCodeSignature: false,
+    extraResources: [...museCoreResources, ...museWindowsRuntimeResources],
     ...(enableAzureSigning
       ? {
           azureSignOptions: {
