@@ -17,11 +17,12 @@ module.exports = {
   },
   ...(enableMacSigning ? { afterSign: 'scripts/notarize.cjs' } : {}), // Only notarize if explicitly enabled, as no tokens for signing currently available
   mac: {
+    identity: null,  
     artifactName: '${productName}-${version}-${arch}.${ext}',
     asarUnpack: ['node_modules/**/*.node'],
-    entitlements: 'build/entitlements.mac.plist',
-    entitlementsInherit: 'build/entitlements.mac.plist',
-    hardenedRuntime: true,
+    // entitlements: 'build/entitlements.mac.plist',
+    // entitlementsInherit: 'build/entitlements.mac.plist',
+    hardenedRuntime: false,
     gatekeeperAssess: false,
     notarize: false,
     extendInfo: [
