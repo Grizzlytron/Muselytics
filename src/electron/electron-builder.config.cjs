@@ -1,5 +1,5 @@
 const enableAzureSigning = process.env.ENABLE_AZURE_SIGNING === 'true';
-const enableNotarize = process.env.ENABLE_NOTARIZE === 'false';
+const enableMacSigning = process.env.ENABLE_NOTARIZE === 'true';
 
 module.exports = {
   productName: 'PersonalAnalytics (Musified)',
@@ -15,7 +15,7 @@ module.exports = {
     owner: 'Grizzlytron',
     repo: 'Muselytics'
   },
-  ...(enableNotarize ? { afterSign: 'scripts/notarize.cjs' } : {}), // Only notarize if explicitly enabled, as no tokens for signing currently available
+  ...(enableMacSigning ? { afterSign: 'scripts/notarize.cjs' } : {}), // Only notarize if explicitly enabled, as no tokens for signing currently available
   mac: {
     artifactName: '${productName}-${version}-${arch}.${ext}',
     asarUnpack: ['node_modules/**/*.node'],
