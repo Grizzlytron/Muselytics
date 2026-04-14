@@ -52,7 +52,7 @@ export class IpcHandler {
   private readonly userInputService: UserInputTrackerService;
   private readonly dataExportService: DataExportService;
   private readonly workScheduleService: WorkScheduleService;
-  private schedulingService: SchedulingService;
+  private schedulingService!: SchedulingService;
   private typedIpcMain: TypedIpcMain<Events, Commands> = ipcMain as TypedIpcMain<Events, Commands>;
 
   constructor(
@@ -136,25 +136,29 @@ export class IpcHandler {
 
   private async createExperienceSample(
     promptedAt: Date,
-    question1: string,
-    responseOptions1: string,
-    question2: string,
+    question: string,
     answerType: ExperienceSamplingAnswerType,
-    responseOptions2: string | null,
+    responseOptions: string | null,
     scale: number | null,
-    response1?: number,
-    response2??: string,
+    response: string | undefined,
+    question2: string | null,
+    answerType2: ExperienceSamplingAnswerType | null,
+    responseOptions2: string | null,
+    scale2: number | null,
+    response2: string | undefined,
     skipped: boolean = false
   ) {
     await this.experienceSamplingService.createExperienceSample(
       promptedAt,
-      question1,
-      responseOptions1,
-      question2,
+      question,
       answerType,
-      responseOptions2,
+      responseOptions,
       scale,
-      response1,
+      response,
+      question2,
+      answerType2,
+      responseOptions2,
+      scale2,
       response2,
       skipped
     );
@@ -238,8 +242,9 @@ export class IpcHandler {
   }
 
   private async setSettingsProp(prop: string, value: any): Promise<void> {
-    const settings: Settings = await Settings.findOne({ where: { onlyOneEntityShouldExist: 1 } });
-    settings[prop] = value;
+    const settings = await Settings.findOne({ where: { onlyOneEntityShouldExist: 1 } });
+    if (!settings) throw new Error('Settings not found');
+    (settings as any)[prop] = value;
     await settings.save();
 
     try {
@@ -250,7 +255,7 @@ export class IpcHandler {
   }
 
   private async getSettings(): Promise<Settings> {
-    const settings: Settings = await Settings.findOne({ where: { onlyOneEntityShouldExist: 1 } });
+    const settings = await Settings.findOne({ where: { onlyOneEntityShouldExist: 1 } });
     if (!settings) {
       throw new Error('Settings not found');
     }
@@ -258,7 +263,8 @@ export class IpcHandler {
   }
 
   private async getStudyInfo(): Promise<StudyInfoDto> {
-    const settings: Settings = await Settings.findOne({ where: { onlyOneEntityShouldExist: 1 } });
+    const settings = await Settings.findOne({ where: { onlyOneEntityShouldExist: 1 } });
+    if (!settings) throw new Error('Settings not found');
 
     const window = new JSDOM('').window;
     const purify = DOMPurify(window);

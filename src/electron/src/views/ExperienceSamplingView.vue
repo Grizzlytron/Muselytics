@@ -1,87 +1,48 @@
 <script lang="ts" setup>
 import typedIpcRenderer from '../utils/typedIpcRenderer';
 import studyConfig from '../../shared/study.config';
-import { computed, nextTick, onMounted, ref } from 'vue';
+import { computed, nextTick, onMounted, ref, watch } from 'vue';
 import type { ExperienceSamplingQuestion } from '../../shared/StudyConfiguration';
 
+const zurichTimeZone = 'Europe/Zurich';
 const esConfig = studyConfig.trackers.experienceSamplingTracker;
 const studyQuestions = esConfig.questions;
 
-const randomQuestionNr = Math.floor(Math.random() * studyQuestions.length);
-const selectedQuestion: ExperienceSamplingQuestion = esConfig.questions[randomQuestionNr];
-const scale =
-  selectedQuestion.answerType === 'LikertScale'
-    ? Array.from({ length: selectedQuestion.scale }, (_, i) => i + 1)
-    : [];
-const choiceOptions =
-  selectedQuestion.answerType === 'SingleChoice' || selectedQuestion.answerType === 'MultiChoice'
-    ? selectedQuestion.responseOptions
-    : [];
-const useChoiceDropdown = computed(() => choiceOptions.length >= 10);
-const choiceSelectSize = computed(() => Math.min(Math.max(choiceOptions.length, 6), 10));
+// Always use the first two configured questions in order.
+const selectedQuestions: ExperienceSamplingQuestion[] =
+  studyQuestions.length >= 2
+    ? [studyQuestions[0], studyQuestions[1]]
+    : studyQuestions.length === 1
+      ? [studyQuestions[0]]
+      : [];
+
+const currentQuestionIndex = ref(0);
+const responses = ref<Array<string | undefined>>([]);
+
+const activeQuestion = computed<ExperienceSamplingQuestion>(
+  () => selectedQuestions[currentQuestionIndex.value] ?? selectedQuestions[0]
+);
+const questionProgressLabel = computed(
+  () => `${Math.min(currentQuestionIndex.value + 1, selectedQuestions.length)} / ${selectedQuestions.length}`
+);
+
+const scale = computed(() =>
+  activeQuestion.value.answerType === 'LikertScale'
+    ? Array.from({ length: activeQuestion.value.scale }, (_, i) => i + 1)
+    : []
+);
+const choiceOptions = computed(() =>
+  activeQuestion.value.answerType === 'SingleChoice' || activeQuestion.value.answerType === 'MultiChoice'
+    ? activeQuestion.value.responseOptions
+    : []
+);
+const useChoiceDropdown = computed(() => choiceOptions.value.length >= 10);
+const choiceSelectSize = computed(() => Math.min(Math.max(choiceOptions.value.length, 6), 10));
 
 const language =
   (typeof navigator !== 'undefined' &&
     (navigator.language || (navigator.languages && navigator.languages[0]))) ||
   'en';
-
-function pickTwoQuestions(): PopupQuestion[] {
-  const available = esConfig.questions.map((questionText, index) => ({
-    question: questionText,
-    labels: esConfig.responseOptions[index] ?? []
-  }));
-
-  const uniqueConfiguredQuestions: PopupQuestion[] = [];
-  const seenQuestions = new Set<string>();
-
-  for (const question of available) {
-    const key = question.question.trim().toLowerCase();
-    if (key.length === 0 || seenQuestions.has(key)) {
-      continue;
-    }
-    seenQuestions.add(key);
-    uniqueConfiguredQuestions.push(question);
-  }
-
-  if (uniqueConfiguredQuestions.length >= 2) {
-    // Always use the two configured questions in definition order.
-    return [uniqueConfiguredQuestions[0], uniqueConfiguredQuestions[1]];
-  }
-
-  if (uniqueConfiguredQuestions.length === 1) {
-    return [
-      uniqueConfiguredQuestions[0],
-      {
-        question: 'How much effort did you put in during the previous session?',
-        labels: ['not much effort', 'moderately much effort', 'very much effort']
-      }
-    ];
-  }
-
-  if (available.length === 0) {
-    return [
-      {
-        question: 'How focused did you feel in the previous session?',
-        labels: ['not focused', 'moderately focused', 'very focused']
-      },
-      {
-        question: 'How well did you spend your time in the previous session?',
-        labels: ['not well', 'moderately well', 'very well']
-      }
-    ];
-  }
-
-  return [available[0], available[1] ?? available[0]];
-}
-
-const selectedQuestions = pickTwoQuestions();
-const currentQuestionIndex = ref(0);
-const responses = ref<Array<number | undefined>>([]);
-
-const activeQuestion = computed(() => selectedQuestions[currentQuestionIndex.value] ?? selectedQuestions[0]);
-const questionProgressLabel = computed(
-  () => `${Math.min(currentQuestionIndex.value + 1, selectedQuestions.length)} / ${selectedQuestions.length}`
-);
 
 const promptedAt = new Date();
 const promptedAtString = new Intl.DateTimeFormat(language, {
@@ -98,7 +59,9 @@ const textResponse = ref('');
 const singleChoiceResponse = ref<string | null>(null);
 const multiChoiceResponse = ref<string[]>([]);
 
-const needsSubmitButton = selectedQuestion.answerType === 'TextResponse' || selectedQuestion.answerType === 'MultiChoice';
+const needsSubmitButton = computed(
+  () => activeQuestion.value.answerType === 'TextResponse' || activeQuestion.value.answerType === 'MultiChoice'
+);
 
 const rootEl = ref<HTMLElement | null>(null);
 
@@ -113,67 +76,74 @@ onMounted(() => {
   measureAndResize();
 });
 
+watch(currentQuestionIndex, () => {
+  textResponse.value = '';
+  singleChoiceResponse.value = null;
+  multiChoiceResponse.value = [];
+  measureAndResize();
+});
+
 const textMode = computed(() => {
-  return selectedQuestion.answerType === 'TextResponse' ? selectedQuestion.responseOptions : 'singleLine';
+  return activeQuestion.value.answerType === 'TextResponse' ? activeQuestion.value.responseOptions : 'singleLine';
 });
 
 const textMaxLength = computed(() => {
-  return selectedQuestion.answerType === 'TextResponse' ? selectedQuestion.maxLength : 0;
+  return activeQuestion.value.answerType === 'TextResponse' ? activeQuestion.value.maxLength : 0;
 });
 
 const isAnswerReady = computed(() => {
-  if (selectedQuestion.answerType === 'TextResponse') {
+  if (activeQuestion.value.answerType === 'TextResponse') {
     return textResponse.value.trim().length > 0;
   }
-  if (selectedQuestion.answerType === 'SingleChoice') {
+  if (activeQuestion.value.answerType === 'SingleChoice') {
     return singleChoiceResponse.value !== null;
   }
-  if (selectedQuestion.answerType === 'MultiChoice') {
+  if (activeQuestion.value.answerType === 'MultiChoice') {
     return multiChoiceResponse.value.length > 0;
   }
   return false;
 });
 
-function buildResponseOptionsSnapshot(): string {
-  if (selectedQuestion.answerType === 'LikertScale') {
+function buildResponseOptionsSnapshot(q: ExperienceSamplingQuestion): string {
+  if (q.answerType === 'LikertScale') {
     return JSON.stringify({
       type: 'LikertScale',
-      scale: selectedQuestion.scale,
-      labels: selectedQuestion.responseOptions
+      scale: q.scale,
+      labels: q.responseOptions
     });
   }
-  if (selectedQuestion.answerType === 'TextResponse') {
+  if (q.answerType === 'TextResponse') {
     return JSON.stringify({
       type: 'TextResponse',
-      inputType: selectedQuestion.responseOptions,
-      maxLength: selectedQuestion.maxLength
+      inputType: q.responseOptions,
+      maxLength: q.maxLength
     });
   }
   return JSON.stringify({
-    type: selectedQuestion.answerType,
-    options: selectedQuestion.responseOptions
+    type: q.answerType,
+    options: q.responseOptions
   });
 }
 
 function buildResponseValue(answer?: number): string | undefined {
-  if (selectedQuestion.answerType === 'LikertScale') {
+  if (activeQuestion.value.answerType === 'LikertScale') {
     return answer?.toString();
   }
-  if (selectedQuestion.answerType === 'TextResponse') {
+  if (activeQuestion.value.answerType === 'TextResponse') {
     const trimmed = textResponse.value.trim();
     return trimmed.length > 0 ? trimmed : undefined;
   }
-  if (selectedQuestion.answerType === 'SingleChoice') {
+  if (activeQuestion.value.answerType === 'SingleChoice') {
     return singleChoiceResponse.value ?? undefined;
   }
-  if (selectedQuestion.answerType === 'MultiChoice') {
+  if (activeQuestion.value.answerType === 'MultiChoice') {
     return multiChoiceResponse.value.length > 0 ? JSON.stringify(multiChoiceResponse.value) : undefined;
   }
   return undefined;
 }
 
 function toggleMultiChoiceOption(option: string) {
-  if (selectedQuestion.answerType !== 'MultiChoice') {
+  if (activeQuestion.value.answerType !== 'MultiChoice') {
     return;
   }
   if (multiChoiceResponse.value.includes(option)) {
@@ -184,7 +154,7 @@ function toggleMultiChoiceOption(option: string) {
 }
 
 function selectSingleChoiceOption(option: string) {
-  if (selectedQuestion.answerType !== 'SingleChoice') {
+  if (activeQuestion.value.answerType !== 'SingleChoice') {
     return;
   }
   singleChoiceResponse.value = option;
@@ -192,7 +162,7 @@ function selectSingleChoiceOption(option: string) {
 }
 
 function onSingleChoiceDropdownChange(value: string) {
-  if (selectedQuestion.answerType !== 'SingleChoice') {
+  if (activeQuestion.value.answerType !== 'SingleChoice') {
     return;
   }
   singleChoiceResponse.value = value || null;
@@ -202,7 +172,7 @@ function onSingleChoiceDropdownChange(value: string) {
 }
 
 function onMultiChoiceDropdownChange(event: Event) {
-  if (selectedQuestion.answerType !== 'MultiChoice') {
+  if (activeQuestion.value.answerType !== 'MultiChoice') {
     return;
   }
   const selected = Array.from((event.target as HTMLSelectElement).selectedOptions).map(
@@ -212,46 +182,45 @@ function onMultiChoiceDropdownChange(event: Event) {
 }
 
 async function createExperienceSample(answer?: number) {
-  isSubmitting.value = true;
-  submitMode.value = 'answer';
-const sampleLoadingValue = ref<number | null | undefined>(undefined);
+  const responseValue = buildResponseValue(answer);
+  responses.value[currentQuestionIndex.value] = responseValue;
 
-async function submitResponse(value: number) {
-  sampleLoadingValue.value = value;
-  responses.value[currentQuestionIndex.value] = value;
-
+  // If there are more questions, advance to the next one.
   if (currentQuestionIndex.value < selectedQuestions.length - 1) {
     await new Promise((resolve) => setTimeout(resolve, 120));
     currentQuestionIndex.value += 1;
-    sampleLoadingValue.value = undefined;
     return;
   }
 
-  const firstQuestion = selectedQuestions[0];
-  const secondQuestion = selectedQuestions[1] ?? selectedQuestions[0];
+  // All questions answered — submit.
+  isSubmitting.value = true;
+  submitMode.value = 'answer';
+
+  const q1 = selectedQuestions[0];
+  const q2 = selectedQuestions.length > 1 ? selectedQuestions[1] : null;
+
   try {
     await Promise.all([
       typedIpcRenderer.invoke(
         'createExperienceSample',
         promptedAt,
-        selectedQuestion.question,
-        selectedQuestion.answerType,
-        buildResponseOptionsSnapshot(),
-        selectedQuestion.answerType === 'LikertScale' ? selectedQuestion.scale : null,
-        buildResponseValue(answer),
-        firstQuestion.question,
-        firstQuestion.labels.join(', '),
-        secondQuestion.question,
-        secondQuestion.labels.join(', '),
-        esConfig.scale,
+        q1.question,
+        q1.answerType,
+        buildResponseOptionsSnapshot(q1),
+        q1.answerType === 'LikertScale' ? q1.scale : null,
         responses.value[0],
-        responses.value[1]
+        q2 ? q2.question : null,
+        q2 ? q2.answerType : null,
+        q2 ? buildResponseOptionsSnapshot(q2) : null,
+        q2 && q2.answerType === 'LikertScale' ? q2.scale : null,
+        responses.value[1],
+        false
       ),
       new Promise((resolve) => setTimeout(resolve, 150))
     ]);
     await typedIpcRenderer.invoke('closeExperienceSamplingWindow', false);
   } catch (error) {
-    console.error('Error creating team', error);
+    console.error('Error creating experience sample', error);
   } finally {
     isSubmitting.value = false;
     submitMode.value = null;
@@ -261,17 +230,24 @@ async function submitResponse(value: number) {
 async function skipExperienceSample() {
   isSubmitting.value = true;
   submitMode.value = 'skip';
-  const firstQuestion = selectedQuestions[0];
-  const secondQuestion = selectedQuestions[1] ?? selectedQuestions[0];
+
+  const q1 = selectedQuestions[0];
+  const q2 = selectedQuestions.length > 1 ? selectedQuestions[1] : null;
+
   try {
     await Promise.all([
       typedIpcRenderer.invoke(
         'createExperienceSample',
         promptedAt,
-        selectedQuestion.question,
-        selectedQuestion.answerType,
-        buildResponseOptionsSnapshot(),
-        selectedQuestion.answerType === 'LikertScale' ? selectedQuestion.scale : null,
+        q1.question,
+        q1.answerType,
+        buildResponseOptionsSnapshot(q1),
+        q1.answerType === 'LikertScale' ? q1.scale : null,
+        undefined,
+        q2 ? q2.question : null,
+        q2 ? q2.answerType : null,
+        q2 ? buildResponseOptionsSnapshot(q2) : null,
+        q2 && q2.answerType === 'LikertScale' ? q2.scale : null,
         undefined,
         true
       ),
@@ -279,7 +255,7 @@ async function skipExperienceSample() {
     ]);
     await typedIpcRenderer.invoke('closeExperienceSamplingWindow', true);
   } catch (error) {
-    console.error('Error creating team', error);
+    console.error('Error creating experience sample', error);
   } finally {
     isSubmitting.value = false;
     submitMode.value = null;
@@ -295,9 +271,12 @@ async function skipExperienceSample() {
     <div class="pointer-events-auto flex flex-row">
       <div class="flex flex-1 p-4 pt-1">
         <div class="flex flex-1 flex-col">
-          <p class="prompt">{{ selectedQuestion.question }}</p>
+          <div class="flex items-baseline justify-between">
+            <p class="prompt">{{ activeQuestion.question }}</p>
+            <span v-if="selectedQuestions.length > 1" class="text-xs text-gray-400 ml-2 whitespace-nowrap">{{ questionProgressLabel }}</span>
+          </div>
 
-          <div v-if="selectedQuestion.answerType === 'LikertScale'" class="-mx-1 mt-2 flex flex-row justify-between">
+          <div v-if="activeQuestion.answerType === 'LikertScale'" class="-mx-1 mt-2 flex flex-row justify-between">
             <div
               v-for="value in scale"
               :key="value"
@@ -313,17 +292,17 @@ async function skipExperienceSample() {
             </div>
           </div>
 
-          <div v-if="selectedQuestion.answerType === 'LikertScale'" class="mt-1 flex flex-row text-sm text-gray-400 dark:text-gray-500">
-            <div class="basis-1/3">{{ selectedQuestion.responseOptions[0] }}</div>
+          <div v-if="activeQuestion.answerType === 'LikertScale'" class="mt-1 flex flex-row text-sm text-gray-400 dark:text-gray-500">
+            <div class="basis-1/3">{{ (activeQuestion as any).responseOptions[0] }}</div>
             <div class="basis-1/3 text-center">
-              <span v-if="selectedQuestion.responseOptions.length === 3">{{ selectedQuestion.responseOptions[1] }}</span>
+              <span v-if="(activeQuestion as any).responseOptions.length === 3">{{ (activeQuestion as any).responseOptions[1] }}</span>
             </div>
             <div class="basis-1/3 text-right">
-              {{ selectedQuestion.responseOptions[2] || selectedQuestion.responseOptions[1] }}
+              {{ (activeQuestion as any).responseOptions[2] || (activeQuestion as any).responseOptions[1] }}
             </div>
           </div>
 
-          <div v-if="selectedQuestion.answerType === 'TextResponse'" class="mt-2 flex flex-col">
+          <div v-if="activeQuestion.answerType === 'TextResponse'" class="mt-2 flex flex-col">
             <div class="text-answer-content">
               <div v-if="textMode === 'singleLine'" class="text-answer-wrapper">
                 <input
@@ -346,11 +325,11 @@ async function skipExperienceSample() {
           </div>
 
           <div
-            v-if="selectedQuestion.answerType === 'SingleChoice' || selectedQuestion.answerType === 'MultiChoice'"
+            v-if="activeQuestion.answerType === 'SingleChoice' || activeQuestion.answerType === 'MultiChoice'"
             class="mt-1 flex flex-col"
           >
             <div class="choice-hint">
-              {{ selectedQuestion.answerType === 'SingleChoice' ? 'Pick one' : 'Pick one or more' }}
+              {{ activeQuestion.answerType === 'SingleChoice' ? 'Pick one' : 'Pick one or more' }}
             </div>
             <div class="choice-answer-content">
               <div v-if="!useChoiceDropdown" class="choice-list">
@@ -359,13 +338,13 @@ async function skipExperienceSample() {
                   :key="option"
                   class="choice-option"
                   :class="{
-                    'choice-option-selected': selectedQuestion.answerType === 'SingleChoice'
+                    'choice-option-selected': activeQuestion.answerType === 'SingleChoice'
                       ? singleChoiceResponse === option
                       : multiChoiceResponse.includes(option)
                   }"
                   :disabled="isSubmitting"
                   @click="
-                    selectedQuestion.answerType === 'SingleChoice'
+                    activeQuestion.answerType === 'SingleChoice'
                       ? selectSingleChoiceOption(option)
                       : toggleMultiChoiceOption(option)
                   "
@@ -376,7 +355,7 @@ async function skipExperienceSample() {
 
               <div v-else>
                 <select
-                  v-if="selectedQuestion.answerType === 'SingleChoice'"
+                  v-if="activeQuestion.answerType === 'SingleChoice'"
                   class="choice-select"
                   :value="singleChoiceResponse ?? ''"
                   :disabled="isSubmitting"

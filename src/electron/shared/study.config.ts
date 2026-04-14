@@ -78,7 +78,6 @@ const studyConfig: StudyConfiguration = {
     experienceSamplingTracker: {
       enabled: true,
       enabledWorkHours: false,
-      scale: 7,
       questions: [
         {
           question:

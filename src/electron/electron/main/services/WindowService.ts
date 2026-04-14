@@ -146,15 +146,6 @@ export class WindowService {
     }
   }
 
-  public resizeExperienceSamplingWindow(height: number) {
-    if (this.experienceSamplingWindow) {
-      const minHeight = 120
-      const maxHeight = 600
-      const clamped = Math.max(minHeight, Math.min(maxHeight, height))
-      this.experienceSamplingWindow.setContentSize(500, clamped)
-    }
-  }
-
   public closeExperienceSamplingWindow(skippedExperienceSampling: boolean) {
     const usageDataEvent = skippedExperienceSampling
       ? UsageDataEventType.ExperienceSamplingSkipped
@@ -271,51 +262,6 @@ export class WindowService {
     if (this.dataExportWindow) {
       this.dataExportWindow.close();
     }
-  }
-
-  public closeRetrospectionWindow() {
-    if (this.retrospectionWindow) {
-      this.retrospectionWindow.close()
-      this.retrospectionWindow = null
-    }
-  }
-
-  public async createRetrospectionWindow() {
-    this.closeRetrospectionWindow()
-
-    const __filename = fileURLToPath(import.meta.url)
-    const __dirname = dirname(__filename)
-    const preload = join(__dirname, '../preload/index.mjs')
-
-    this.retrospectionWindow = new BrowserWindow({
-      width: 850,
-      height: 800,
-      minWidth: 800,
-      minHeight: 750,
-      show: false,
-      minimizable: false,
-      maximizable: false,
-      fullscreenable: false,
-      resizable: true,
-      title: 'PersonalAnalytics: Retrospection',
-      webPreferences: {
-        preload
-      }
-    })
-
-    if (process.env.VITE_DEV_SERVER_URL) {
-      await this.retrospectionWindow.loadURL(process.env.VITE_DEV_SERVER_URL + '#retrospection')
-    } else {
-      await this.retrospectionWindow.loadFile(path.join(process.env.DIST, 'index.html'), {
-        hash: 'retrospection'
-      })
-    }
-
-    this.retrospectionWindow.show()
-
-    this.retrospectionWindow.on('close', () => {
-      this.retrospectionWindow = null
-    })
   }
 
   public closeRetrospectionWindow() {
@@ -764,14 +710,6 @@ export class WindowService {
         label: 'Onboarding',
         click: () => this.createOnboardingWindow(),
         visible: is.dev
-      },
-      {
-        label: 'Open Muse Interface',
-        click: () => this.createMuseWindow()
-      },
-      {
-        label: 'Open Study Tasks',
-        click: () => this.createNBackWindow()
       },
       {
         label: 'Open Muse Interface',

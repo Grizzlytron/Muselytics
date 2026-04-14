@@ -8,31 +8,32 @@ const LOG = getMainLogger('ExperienceSamplingService');
 export class ExperienceSamplingService {
   public async createExperienceSample(
     promptedAt: Date,
-    question1: string,
-    responseOptions1: string,
-    question2: string,
+    question: string,
     answerType: ExperienceSamplingAnswerType,
-    responseOptions2: string | null,
+    responseOptions: string | null,
     scale: number | null,
-    response1?: number,
-    response2??: string,
-    skipped: boolean
+    response: string | undefined,
+    question2: string | null,
+    answerType2: ExperienceSamplingAnswerType | null,
+    responseOptions2: string | null,
+    scale2: number | null,
+    response2: string | undefined,
+    skipped: boolean = false
   ): Promise<void> {
     LOG.debug(
-      `createExperienceSample: promptedAt=${promptedAt}, question1=${question1}, response1=${response1}, question2=${question2}, response2=${response2}, skipped=${skipped}`
+      `createExperienceSample: promptedAt=${promptedAt}, question=${question}, response=${response}, question2=${question2}, response2=${response2}, skipped=${skipped}`
     );
     await ExperienceSamplingResponseEntity.save({
-      question: question1,
-      question1,
-      question2,
-      responseOptions: responseOptions1,
-      responseOptions1,
+      question,
       answerType,
-      responseOptions2,
+      responseOptions,
       scale,
-      response: response1,
-      response1,
-      response2,
+      response: response ?? null,
+      question2,
+      answerType2,
+      responseOptions2,
+      scale2,
+      response2: response2 ?? null,
       promptedAt,
       skipped
     });
@@ -47,17 +48,16 @@ export class ExperienceSamplingService {
     });
     return experienceSamplingResponses.map((response) => ({
       id: response.id,
-      question: response.question1 ?? response.question,
-      question1: response.question1 ?? response.question,
-      question2: response.question2 ?? response.question,
+      question: response.question,
       answerType: response.answerType,
-      responseOptions: response.responseOptions1 ?? response.responseOptions,
-      responseOptions1: response.responseOptions1 ?? response.responseOptions,
-      responseOptions2: response.responseOptions2 ?? response.responseOptions,
+      responseOptions: response.responseOptions,
       scale: response.scale,
-      response: response.response1 ?? response.response,
-      response1: response.response1 ?? response.response,
-      response2: response.response2 ?? response.response,
+      response: response.response,
+      question2: response.question2,
+      answerType2: response.answerType2,
+      responseOptions2: response.responseOptions2,
+      scale2: response.scale2,
+      response2: response.response2,
       promptedAt: response.promptedAt,
       skipped: response.skipped,
       createdAt: response.createdAt,

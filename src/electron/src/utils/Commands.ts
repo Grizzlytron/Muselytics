@@ -12,13 +12,15 @@ import type { ExperienceSamplingAnswerType } from '../../shared/StudyConfigurati
 type Commands = {
   createExperienceSample: (
     promptedAt: Date,
-    question1: string,
-    responseOptions1: string,
-    question2: string,
+    question: string,
     answerType: ExperienceSamplingAnswerType,
-    responseOptions2: string | null,
-    scale?: number | null,
-    response1?: number,
+    responseOptions: string | null,
+    scale: number | null,
+    response?: string,
+    question2?: string | null,
+    answerType2?: ExperienceSamplingAnswerType | null,
+    responseOptions2?: string | null,
+    scale2?: number | null,
     response2?: string,
     skipped?: boolean
   ) => Promise<void>;
@@ -43,7 +45,6 @@ type Commands = {
   setWorkHours: (schedule: WorkHoursDto) => Promise<void>;
   setSettingsProp: (prop: string, value: any) => Promise<void>;
   getSettings: () => Promise<Settings>;
-  getWorkHoursEnabled: () => Promise<boolean>;
   openLogs: () => void;
   openCollectedData: () => void;
   getMostRecentExperienceSamplingDtos(itemCount: number): Promise<ExperienceSamplingDto[]>;

@@ -8,7 +8,7 @@ import { ExperienceSamplingResponseEntity } from '../entities/ExperienceSampling
 import { UserInputEntity } from '../entities/UserInputEntity';
 import { Settings } from '../entities/Settings';
 import { UsageDataEntity } from '../entities/UsageDataEntity';
-import { WorkDayEntity } from '../entities/WorkDayEntity';;
+import { WorkDayEntity } from '../entities/WorkDayEntity';
 import { MuseRawEegEntity } from '../entities/MuseRawEegEntity';
 import { MuseRawOpticsEntity } from '../entities/MuseRawOpticsEntity';
 import { MuseMetadataEntity } from '../entities/MuseMetadataEntity';
@@ -37,7 +37,11 @@ export class DatabaseService {
       UsageDataEntity,
       UserInputEntity,
       WindowActivityEntity,
-      WorkDayEntity
+      WorkDayEntity,
+      MuseRawEegEntity,
+      MuseRawOpticsEntity,
+      MuseMetadataEntity,
+      NBackTaskBlockEntity
     ];
 
     const options: DataSourceOptions = {

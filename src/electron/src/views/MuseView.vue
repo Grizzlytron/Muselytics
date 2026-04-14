@@ -566,10 +566,11 @@ const eegChartData = computed(() => {
   const visibleData = pageData.length > 0 ? pageData : latestData.value;
 
   const toPoint = (timestamp: Date, value: number | undefined) => {
-    const ageMs = windowEndTs - timestamp.getTime();
+    const ageSec = (windowEndTs - timestamp.getTime()) / 1000;
     return {
-      // Plot elapsed-window age so the newest sample is 0s.
-      x: Math.min(CHART_PAGE_SECONDS, Math.max(0, ageMs / 1000)),
+      // Negative age: -30 = oldest (left), 0 = newest (right).
+      // Data enters at x≈0 and scrolls left as it ages.
+      x: -Math.min(CHART_PAGE_SECONDS, Math.max(0, ageSec)),
       y: typeof value === 'number' && Number.isFinite(value) ? value : null
     };
   };
@@ -632,15 +633,14 @@ const eegChartOptions = computed(() => {
     scales: {
       x: {
         type: 'linear' as const,
-        min: 0,
-        max: CHART_PAGE_SECONDS,
-        reverse: true,
+        min: -CHART_PAGE_SECONDS,
+        max: 0,
         display: true,
-        title: { display: true, text: 'Elapsed Window Time (s)' },
+        title: { display: true, text: 'Time' },
         ticks: {
           stepSize: 5,
           callback: (value: any) => {
-            const seconds = Number(value);
+            const seconds = Math.abs(Number(value));
             if (Number.isNaN(seconds)) return '';
             return `${Math.round(seconds)}s`;
           },
