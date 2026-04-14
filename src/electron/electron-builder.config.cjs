@@ -33,7 +33,18 @@ module.exports = {
   directories: {
     output: 'release/${version}'
   },
-  files: ['dist', 'dist-electron', '!node_modules/uiohook-napi/build/**'],
+  files: [
+    'dist',
+    'dist-electron',
+    '!node_modules/uiohook-napi/build/**',
+    // Explicitly include muse-tracker from real path — npm file: dependency
+    // creates a junction/symlink that electron-builder may not resolve in the asar
+    {
+      from: 'PA.MuseTracker/typescript',
+      to: 'node_modules/muse-tracker',
+      filter: ['package.json', 'dist/**']
+    }
+  ],
   publish: {
     provider: 'github',
     owner: 'Grizzlytron',

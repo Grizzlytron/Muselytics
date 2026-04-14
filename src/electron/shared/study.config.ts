@@ -81,16 +81,16 @@ const studyConfig: StudyConfiguration = {
       questions: [
         {
           question:
-            'Compared to your normal level of focus, how focused did you feel in the last session?',
+            'Compared to your normal level of focus, how focused did you feel in the last interval?',
           answerType: 'LikertScale',
           scale: 7,
           responseOptions: ['not at all focused', 'moderately focused', 'very focused']
         },
         {
-          question: 'Compared to your normal level of mental effort, how much effort did you put in the last session?',
+          question: 'Compared to your normal level of mental effort, how mentally demanding did you find the last interval?',
           answerType: 'LikertScale',
           scale: 7,
-          responseOptions: ['not much effort', 'moderately much effort', 'very much effort']
+          responseOptions: ['not at all demanding', 'moderately demanding', 'very demanding']
         },
         // {
         //   question: 'Compared to your normal level of mental effort, how much effort did you put in the last session?'
