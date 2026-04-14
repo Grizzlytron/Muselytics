@@ -1,6 +1,5 @@
 {
   "compilerOptions": {
-    "ignoreDeprecations": "6.0",
     "composite": true,
     "module": "ESNext",
     "moduleResolution": "Node",
@@ -9,5 +8,5 @@
     "experimentalDecorators": true,
     "baseUrl": "."
   },
-  "include": ["vite.config.ts", "package.json", "electron", "shared", "src/utils"]
+  "include": ["vite.config.ts", "package.json", "electron"]
 }

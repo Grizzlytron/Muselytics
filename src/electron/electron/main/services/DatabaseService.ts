@@ -17,7 +17,7 @@ import { NBackTaskBlockEntity } from '../entities/NBackTaskBlockEntity';
 const LOG = getMainLogger('DatabaseService');
 
 export class DatabaseService {
-  public dataSource: DataSource;
+  public dataSource!: DataSource;
   private readonly dbPath: string;
 
   constructor() {

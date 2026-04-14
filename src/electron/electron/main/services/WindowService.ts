@@ -33,16 +33,16 @@ type NBackSessionContext = {
 
 export class WindowService {
   private readonly appUpdaterService: AppUpdaterService;
-  private tray: Tray;
-  private experienceSamplingWindow: BrowserWindow;
-  private onboardingWindow: BrowserWindow;
-  private dataExportWindow: BrowserWindow;
-  private settingsWindow: BrowserWindow;
-  private MuseWindow: BrowserWindow;
-  private nBackWindow: BrowserWindow;
+  private tray!: Tray;
+  private experienceSamplingWindow: BrowserWindow | null = null;
+  private onboardingWindow: BrowserWindow | null = null;
+  private dataExportWindow: BrowserWindow | null = null;
+  private settingsWindow: BrowserWindow | null = null;
+  private MuseWindow: BrowserWindow | null = null;
+  private nBackWindow: BrowserWindow | null = null;
   private nBackCloseSource: NBackCloseSource = 'unknown';
   private nBackSessionContext: NBackSessionContext = {};
-  private retrospectionWindow: BrowserWindow
+  private retrospectionWindow: BrowserWindow | null = null
 
   private hasOpenedDataExportUrl: boolean = false;
   private hasRevealedDataEportFolder: boolean = false;
@@ -662,7 +662,7 @@ export class WindowService {
   }
 
   private async getTrayMenuTemplate(): Promise<MenuItemConstructorOptions[]> {
-    const settings: Settings = await Settings.findOne({ where: { onlyOneEntityShouldExist: 1 } });
+    const settings = await Settings.findOne({ where: { onlyOneEntityShouldExist: 1 } });
 
     const es = studyConfig.trackers.experienceSamplingTracker;
     const allowDisable = es.allowUserToDisable ?? true;
@@ -679,15 +679,15 @@ export class WindowService {
       },
       { type: 'separator' },
       {
-        label: `Subject ID: ${settings.subjectId}`,
+        label: `Subject ID: ${settings?.subjectId ?? 'N/A'}`,
         enabled: false
       },
       {
         label: 'Copy Subject Id',
-        click: () => clipboard.writeText(settings.subjectId)
+        click: () => clipboard.writeText(settings?.subjectId ?? '')
       },
       {
-        label: `Days participated: ${settings.daysParticipated}`,
+        label: `Days participated: ${settings?.daysParticipated ?? 0}`,
         enabled: false,
         visible: studyConfig.displayDaysParticipated
       },
