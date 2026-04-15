@@ -423,8 +423,6 @@ let lastDataHash = ''; // track whether EEG data actually changed
 const CHART_PAGE_SECONDS = 30;
 const EEG_REFRESH_MS = 2000;
 const NON_EEG_REFRESH_MS = 8000;
-const EEG_DISPLAY_MIN_UV = 0;
-const EEG_DISPLAY_MAX_UV = 1000;
 const SIGNAL_RECENT_WINDOW_MS = 5000;
 
 // Filter out connected device from discovered devices list
@@ -504,14 +502,6 @@ const signalQualityBadgeClass = computed(() => {
   return 'badge-error';
 });
 
-const signalQualityProgressClass = computed(() => {
-  const q = connectedDevice.value?.signalQuality;
-  if (q === null || q === undefined || q <= 0) return 'progress-neutral';
-  if (q <= 1) return 'progress-success';
-  if (q <= 2) return 'progress-warning';
-  return 'progress-error';
-});
-
 const eegWindowState = computed(() => {
   if (latestData.value.length === 0) {
     return {
@@ -525,8 +515,10 @@ const eegWindowState = computed(() => {
 
   const firstTs = new Date(latestData.value[0].timestamp).getTime();
   const latestTs = new Date(latestData.value[latestData.value.length - 1].timestamp).getTime();
-  // Use wall-clock time while running so the window fills smoothly even if incoming timestamps are bursty.
-  const windowEndTs = isTrackerRunning.value ? Math.max(latestTs, nowMs.value) : latestTs;
+  // Anchor the window to the latest data timestamp so data always spreads
+  // across the chart.  Using wall-clock time (nowMs) caused the window to drift
+  // ahead of data, pushing all points to x = -30 when timestamps lagged.
+  const windowEndTs = latestTs;
   const requestedAnchorTs = eegWindowAnchorMs.value ?? firstTs;
   // Keep anchor inside the visible data range to prevent empty chart windows.
   const anchorTs = Math.min(Math.max(requestedAnchorTs, firstTs), windowEndTs);
@@ -659,7 +651,6 @@ const eegChartOptions = computed(() => {
     },
     plugins: {
       legend: { display: true, position: 'top' as const },
-      tooltip: { enabled: true }
     }
   };
 });
