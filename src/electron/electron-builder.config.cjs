@@ -37,7 +37,7 @@ module.exports = {
   publish: {
     provider: 'github',
     owner: 'Grizzlytron',
-    repo: 'Muselytics'
+    repo: 'PersonalAnalytics-Musified',
   },
   afterPack: 'scripts/ensure-mac-bluetooth-plist.cjs',
   ...(enableMacSigning ? { afterSign: 'scripts/notarize.cjs' } : {}), // Only notarize if explicitly enabled, as no tokens for signing currently available

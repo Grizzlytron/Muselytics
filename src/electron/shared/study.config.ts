@@ -2,12 +2,12 @@ import { StudyConfiguration } from './StudyConfiguration';
 import { DataExportFormat } from './DataExportFormat.enum';
 
 const studyConfig: StudyConfiguration = {
-  name: 'Muselytics',
+  name: 'Measuring cognitive load and focus in Software Developers',
   shortDescription:
-    "Muselytics is a version of PersonalAnalytics, which integrates a Muse S Athena (2025) tracker into PersonalAnalytics and extends the self-monitoring software developed by the Human Aspects of Software Engineering Lab of the University of Zurich to non-intrusively collect computer interaction data and store it locally on your computer. Every now and then, a self-reflection question asks you about time well spent and perceived productivity. In the future, it will add a retrospection that will visualize and correlate the automatically collected and manually reported data to help you learn more about how you spend your time and your productivity. This software is open source, can be adapted and re-used for your own scientific studies.",
-  infoUrl: 'https://github.com/Grizzlytron/Muselytics',
+    "This study aims to measure cognitive load and focus on tasks using a Muse S Athena (2025) tracker integrated into PersonalAnalytics. This study uses the self-monitoring software developed by the Human Aspects of Software Engineering Lab of the University of Zurich to non-intrusively collect computer interaction data and store it locally on your computer. Every now and then, a self-reflection question asks you about time well spent and perceived productivity. This software is open source, can be adapted and re-used for your own scientific studies.",
+  infoUrl: 'https://github.com/Grizzlytron/PersonalAnalytics-Musified',
   privacyPolicyUrl:
-    'https://github.com/Grizzlytron/Muselytics/blob/dev/documentation/PRIVACY.md',
+    'https://github.com/Grizzlytron/PersonalAnalytics-Musified/blob/dev/documentation/PRIVACY.md',
   uploadUrl:
     'https://www.dropbox.com/scl/fo/3icsygtmvnqnljjkyuu4j/AG-GaLrWqT_o2tU7n9qnFvM?rlkey=9z2voh0de4xh2a2d47n1ghasy&st=6e8mmf3f&dl=0', // https://datadonation.uzh.ch/ddm/studies/grizzlyAnalytics/briefing/
   contactName: 'Lucas Bär',

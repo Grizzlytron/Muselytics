@@ -570,15 +570,15 @@ const speedPercentDisplay = computed(() => {
 
     if (isTargetTrial) {
       if (pressedActionButton && trial.isCorrect) {
-        return acc + 1;
+        return acc + 2;
       }
 
       // Target shown but no correct press: count as missed boost opportunity.
-      return acc - 2;
+      return acc - 3;
     }
 
     if (pressedActionButton) {
-      return acc - 2;
+      return acc - 3;
     }
 
     return acc;

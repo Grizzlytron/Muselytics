@@ -143,7 +143,7 @@
               <div class="grid grid-cols-2 gap-2">
                 <button
                   @click="connectToSelectedDevice"
-                  :disabled="!selectedDeviceMac || isConnecting || !!connectedDevice"
+                  :disabled="!selectedDeviceMac || isConnecting || !!connectedDevice || !isTrackerRunning"
                   class="btn btn-success btn-sm w-full gap-2"
                 >
                   <svg
@@ -166,7 +166,7 @@
                 </button>
                 <button
                   @click="disconnectDevice"
-                  :disabled="!connectedDevice"
+                  :disabled="!connectedDevice || !isTrackerRunning"
                   class="btn btn-error btn-sm w-full gap-2"
                 >
                   <svg
