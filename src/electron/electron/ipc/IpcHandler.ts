@@ -123,8 +123,7 @@ export class IpcHandler {
       'muse:get-data-for-export': this.getMuseDataForExport,
       'muse:get-discovered-devices': this.getDiscoveredDevices,
       'muse:connect-device': this.connectToDevice,
-      'muse:disconnect-device': this.disconnectDevice,
-      'muse:run-diagnostics': this.runMuseDiagnostics
+      'muse:disconnect-device': this.disconnectDevice
     };
 
     Object.keys(this.actions).forEach((action: string): void => {
@@ -850,19 +849,4 @@ export class IpcHandler {
     }
   }
 
-  private async runMuseDiagnostics(): Promise<void> {
-    try {
-      LOG.info('IPC: Running Muse diagnostics');
-      const tracker = this.trackerService.getTracker('MuseTracker') as any;
-      if (tracker && tracker.runDiagnostics) {
-        tracker.runDiagnostics();
-        LOG.info('Diagnostics completed - check main process logs');
-      } else {
-        LOG.warn('Muse tracker not available for diagnostics');
-      }
-    } catch (error) {
-      LOG.error('Error running diagnostics', error);
-      throw error;
-    }
-  }
 }

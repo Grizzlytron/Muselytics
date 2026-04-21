@@ -288,15 +288,15 @@
         </div>
 
         <!-- EEG Data Table -->
-        <div class="card h-64 bg-base-200 shadow-xl">
-          <div class="card-body p-4">
-            <h3 class="card-title text-sm">📋 Recent EEG Readings</h3>
+        <div class="card bg-base-200 shadow-xl" style="height: 16rem;">
+          <div class="card-body flex flex-col overflow-hidden p-4">
+            <h3 class="card-title shrink-0 text-sm">📋 Recent EEG Readings</h3>
             <div v-if="latestData.length === 0" class="flex flex-1 items-center justify-center">
               <p class="text-sm text-base-content/60">No data available yet</p>
             </div>
-            <div v-else class="flex-1 overflow-auto">
+            <div v-else class="min-h-0 flex-1 overflow-y-auto">
               <table class="table table-xs w-full">
-                <thead class="sticky top-0 bg-base-300">
+                <thead class="sticky top-0 z-10 bg-base-300">
                   <tr>
                     <th>Time</th>
                     <th>TP9</th>
