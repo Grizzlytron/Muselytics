@@ -728,20 +728,6 @@ export class MuseTracker implements Tracker {
     return this.nativeAvailable;
   }
 
-  /**
-   * Get real-time EEG data for visualization
-   */
-  public getRealtimeEEG(): DataPacket[] {
-    return [...this.eegBuffer];
-  }
-
-  /**
-   * Run diagnostic checks on native module and device discovery
-   */
-  public runDiagnostics(): void {
-    LOG.info(`MuseTracker: native=${this.nativeAvailable} running=${this.isRunning} connected=${this.isConnected} device=${this.currentDeviceName || 'None'}`);
-  }
-
   /** Persist buffered raw EEG packets in batch to SQLite. */
   private async aggregateAndSave(): Promise<void> {
     if (this.aggregateAndSaveInFlight) {
