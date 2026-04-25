@@ -589,19 +589,18 @@ const speedPercentDisplay = computed(() => {
       trial.expectedSquare !== null && trial.stimulusSquare === trial.expectedSquare;
     const pressedActionButton = trial.responded && trial.pressedKey?.trim().toUpperCase() === 'J';
 
+    let next = acc;
     if (isTargetTrial) {
       if (pressedActionButton && trial.isCorrect) {
-        return acc + 3;
+        next = acc + 3;
+      } else {
+        next = acc - 4;
       }
-
-      return acc - 4;
+    } else if (pressedActionButton) {
+      next = acc - 4;
     }
 
-    if (pressedActionButton) {
-      return acc - 4;
-    }
-
-    return acc;
+    return Math.max(-evaluableTrialsForLevel, Math.min(evaluableTrialsForLevel, next));
   }, 0);
   const stepPerTrial = 50 / evaluableTrialsForLevel;
   return Math.max(0, Math.min(100, 50 + score * stepPerTrial));
