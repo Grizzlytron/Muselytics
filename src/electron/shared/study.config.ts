@@ -105,8 +105,8 @@ const studyConfig: StudyConfiguration = {
         //   responseOptions: ['Notifications', 'Meetings', 'Context switching', 'Personal interruptions', 'None']
         // }
       ],
-      intervalInMs: 1000 * 60 * 15, // default interval (must be listed in userDefinedInterval_h if set)
-      samplingRandomization: 0.2, // 20% randomization, so the interval will be between 12 and 18 minutes
+      intervalInMs: 1000 * 60 * 30, // default interval (must be listed in userDefinedInterval_h if set)
+      samplingRandomization: 0.2, // 20% randomization, so the interval will be between 24 and 36 minutes
       allowUserToDisable: true,
       allowUserToChangeInterval: true,
       userDefinedInterval_h: [0.0833, 0.25, 0.5, 1, 2, 4]

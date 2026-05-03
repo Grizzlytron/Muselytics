@@ -501,7 +501,7 @@ export class WindowService {
   private buildNBackWindowMenu(): Menu {
     const template: MenuItemConstructorOptions[] = [
       {
-        label: 'Study Tasks',
+        label: 'Baseline Task',
         submenu: [
           {
             label: 'Reload Window',
@@ -515,7 +515,7 @@ export class WindowService {
           },
           { type: 'separator' },
           {
-            label: 'Close Study Tasks',
+            label: 'Close Baseline Task',
             accelerator: is.macOS ? 'CmdOrCtrl+W' : 'Alt+F4',
             click: () => {
               this.nBackCloseSource = 'menu-close';
@@ -731,7 +731,7 @@ export class WindowService {
         click: () => this.createMuseWindow()
       },
       {
-        label: 'Open Study Tasks',
+        label: 'Open Baseline Task',
         click: () => this.createNBackWindow()
       },
       {
